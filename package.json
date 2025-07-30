@@ -1,0 +1,38 @@
+{
+  "name": "castles-of-the-wind-clone",
+  "version": "0.1.0",
+  "description": "A modern web-based recreation of the classic 1989 roguelike RPG Castle of the Winds",
+  "main": "main.js",
+  "scripts": {
+    "dev": "live-server --port=3000 --host=localhost --open=/",
+    "start": "npm run dev",
+    "build": "echo 'Build script will be added in later phases'",
+    "test": "echo 'Test script will be added in later phases'"
+  },
+  "keywords": [
+    "game",
+    "roguelike",
+    "kaplay",
+    "javascript",
+    "castle-of-the-winds",
+    "rpg",
+    "tile-based"
+  ],
+  "author": "Castle Wind Clone Team",
+  "license": "MIT",
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  },
+  "dependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/castle-wind-clone.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/castle-wind-clone/issues"
+  },
+  "homepage": "https://github.com/yourusername/castle-wind-clone#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

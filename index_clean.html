@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Castles of the Wind - Clone</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: monospace;
+        }
+        
+        #game-canvas {
+            border: 2px solid #333;
+            background: #111;
+        }
+        
+        .game-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #ccc;
+            font-size: 12px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="game-canvas"></canvas>
+    
+    <div class="game-info">
+        <h3>Castles of the Wind Clone</h3>
+        <p>Status: <span id="status">Loading...</span></p>
+        <p>Version: Clean Demo</p>
+    </div>
+    
+    <!-- Load Kaplay from CDN -->
+    <script src="https://unpkg.com/kaplay@3001.0.0/dist/kaplay.js"></script>
+    
+    <!-- Load our clean game -->
+    <script src="main_clean.js"></script>
+    
+    <script>
+        // Update status
+        document.getElementById('status').textContent = 'Running';
+        console.log('🎮 Clean version loaded successfully!');
+    </script>
+</body>
+</html>

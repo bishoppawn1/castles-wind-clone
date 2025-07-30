@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        #game-canvas {
+            border: 2px solid #333;
+            background: #111;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="game-canvas"></canvas>
+    
+    <!-- Load Kaplay from CDN -->
+    <script src="https://unpkg.com/kaplay@3001.0.0/dist/kaplay.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 DOM loaded, initializing simple test...');
+            
+            const canvas = document.getElementById('game-canvas');
+            if (!canvas) {
+                console.error('❌ Canvas not found!');
+                return;
+            }
+            
+            console.log('✅ Canvas found, creating Kaplay...');
+            
+            const k = kaplay({
+                canvas: canvas,
+                width: 800,
+                height: 600,
+                scale: 1.0,
+                crisp: true,
+                background: [20, 20, 30]
+            });
+            
+            console.log('✅ Kaplay created successfully!');
+            
+            k.scene("test", () => {
+                console.log('✅ Test scene created');
+                
+                k.add([
+                    k.text("SIMPLE TEST WORKING!", {
+                        size: 32,
+                        font: "monospace"
+                    }),
+                    k.pos(k.width() / 2, k.height() / 2),
+                    k.anchor("center"),
+                    k.color(255, 255, 255)
+                ]);
+                
+                k.add([
+                    k.text("If you see this, the basic setup works", {
+                        size: 16,
+                        font: "monospace"
+                    }),
+                    k.pos(k.width() / 2, k.height() / 2 + 50),
+                    k.anchor("center"),
+                    k.color(150, 150, 150)
+                ]);
+            });
+            
+            k.go("test");
+            console.log('✅ Scene started');
+        });
+    </script>
+</body>
+</html>

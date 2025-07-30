@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal Test</title>
+</head>
+<body>
+    <canvas id="game-canvas"></canvas>
+    
+    <!-- Load Kaplay from CDN -->
+    <script src="https://unpkg.com/kaplay@3001.0.0/dist/kaplay.js"></script>
+    
+    <script>
+        // Minimal test
+        const k = kaplay({
+            canvas: document.getElementById('game-canvas'),
+            width: 1024,
+            height: 576,
+            scale: 1.0,
+            crisp: true
+        });
+        
+        // Simple menu scene
+        k.scene("menu", () => {
+            k.add([
+                k.rect(k.width(), k.height()),
+                k.color(15, 15, 25),
+                k.pos(0, 0)
+            ]);
+            
+            k.add([
+                k.text("MINIMAL TEST", {
+                    size: 48,
+                    font: "monospace"
+                }),
+                k.pos(k.width() / 2, k.height() / 2),
+                k.anchor("center"),
+                k.color(220, 180, 100)
+            ]);
+            
+            console.log("Menu scene created");
+        });
+        
+        k.go("menu");
+        console.log("Game started");
+    </script>
+</body>
+</html>

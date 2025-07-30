@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Castles of the Wind Clone</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            overflow: hidden; /* Prevent scrollbars */
+        }
+        
+        #game-container {
+            border: 2px solid #444;
+            background: #222;
+            width: 90vw; /* Use 90% of viewport width */
+            height: 90vh; /* Use 90% of viewport height */
+            max-width: 1200px; /* Maximum width */
+            max-height: 800px; /* Maximum height */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        canvas {
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+            width: 100% !important; /* Force canvas to fill container */
+            height: 100% !important;
+            object-fit: contain; /* Maintain aspect ratio */
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+    </div>
+    
+    <!-- Load Kaplay from CDN -->
+    <script src="https://unpkg.com/kaplay@3001.0.0/dist/kaplay.js"></script>
+    
+    <!-- Load grid utilities -->
+    <script src="utils/grid.js"></script>
+    
+    <!-- Load camera system -->
+    <script src="systems/camera.js"></script>
+    
+    <!-- Load game state manager -->
+    <script src="systems/gamestate.js"></script>
+    
+    <!-- Load player entity -->
+    <script src="entities/player.js"></script>
+    
+    <!-- Load menu scene -->
+    <script src="scenes/menu.js"></script>
+    
+    <!-- Load inventory scene -->
+    <script src="scenes/inventory.js"></script>
+    
+    <!-- Load level system -->
+    <script src="data/levels.js" type="module"></script>
+    <script src="data/tiles.js" type="module"></script>
+    <script src="systems/level.js" type="module"></script>
+    
+    <!-- Load our game -->
+    <script src="main.js"></script>
+</body>
+</html>
