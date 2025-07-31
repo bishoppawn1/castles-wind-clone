@@ -13,6 +13,21 @@ task:
       2. Then continue with the first unchecked item [ ]
     - Update the checklist as needed when new tasks are identified
 
+# Auto-loaded Files
+auto_load:
+  - path: castles-wind-clone-PRD.md  # Project requirements
+    purpose: "Project requirements and specifications"
+    required: true
+  - path: castles-wind-clone-dev1.md  # Task checklist
+    purpose: "Development task checklist"
+    required: true
+  - path: src/main.js                # Main game entry point
+    purpose: "Main game initialization"
+    required: true
+  - path: entities/player.js         # Player entity definition
+    purpose: "Player character implementation"
+    required: false  # Optional, as it might be recreated
+
 # Developer Profile
 dev_level: junior  # User is a junior developer
 
