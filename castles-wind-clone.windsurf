@@ -1,0 +1,64 @@
+# Windsurf Rules for Castles of the Wind Clone
+
+# Project Documentation
+prd: castles-wind-clone-PRD.md
+task: 
+  file: castles-wind-clone-dev1.md
+  type: markdown_checklist
+  usage: |
+    - This is a markdown checklist file tracking development tasks
+    - Check off items as they are completed using [x]
+    - When resuming work in a new chat:
+      1. First verify all checked items [x] are still working
+      2. Then continue with the first unchecked item [ ]
+    - Update the checklist as needed when new tasks are identified
+
+# Developer Profile
+dev_level: junior  # User is a junior developer
+
+# Code Review Rules
+code_review:
+  explanations: detailed  # Provide detailed explanations for all code changes
+  complexity: simple      # Prefer simple, straightforward solutions
+  comments: encouraged    # Encourage adding comments for complex logic
+
+# Explanation Guidelines
+explanations:
+  code_changes: true     # Explain all code changes
+  reasoning: true        # Include reasoning behind decisions
+  alternatives: true     # Mention alternative approaches considered
+  examples: true         # Provide examples when helpful
+
+# Learning Objectives
+learning:
+  - game_development
+  - javascript
+  - kaplay_engine
+  - grid_based_movement
+  - game_mechanics
+
+# Project Structure
+project_structure:
+  - src/
+    - entities/    # Game entities (player, enemies, etc.)
+    - scenes/      # Game scenes/levels
+    - systems/     # Game systems (combat, inventory, etc.)
+    - utils/       # Utility functions
+    - assets/      # Game assets (sprites, sounds, etc.)
+  - docs/         # Documentation
+  - tests/        # Test files
+
+# Best Practices
+best_practices:
+  - "Use clear, descriptive variable and function names"
+  - "Keep functions small and focused on a single task"
+  - "Add comments for complex logic"
+  - "Follow consistent code formatting"
+  - "Test changes incrementally"
+
+# Communication Style
+communication:
+  tone: friendly
+  style: educational
+  patience: high  # Be patient with explanations
+  questions: encouraged  # Encourage asking questions
