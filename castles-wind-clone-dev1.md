@@ -25,7 +25,7 @@ This document breaks down the Phase 1 (MVP) development tasks from section 9.1 o
 - [x] Implement smooth tweening between tiles using `tween()` (`main.js`)
 - [x] Add collision detection using Kaplay's `area()` and wall detection (`main.js`)
 - [x] **ENHANCED**: Advanced mouse targeting with coordinate conversion and target locking
-- [x] **ENHANCED**: Diagonal movement with alternating pattern to prevent overshooting
+- [x] **ENHANCED**: Diagonal movement with alternating pattern to prevent overshooting 
 - [x] **ENHANCED**: Click debouncing and movement interruption handling
 
 ### 1.3 Game World Structure
@@ -47,30 +47,43 @@ This document breaks down the Phase 1 (MVP) development tasks from section 9.1 o
 
 ### 2.1 Enemy System
 **Files: `entities/enemy.js`, `systems/ai.js`, `data/enemies.js`**
-- [ ] Create enemy game objects using Kaplay's `add()` with health component (`entities/enemy.js`)
-- [ ] Implement AI using Kaplay's `onUpdate()` for pathfinding logic (`systems/ai.js`)
-- [ ] Add enemy sprites and animations using Kaplay's animation system (`entities/enemy.js`)
-- [ ] Create enemy spawning using `spawn()` and level data integration (`systems/spawning.js`)
-- [ ] Implement health system using custom health component (`components/health.js`)
-- [ ] Define enemy types using Kaplay tags and custom components (`data/enemies.js`)
+- [x] Create enemy game objects using Kaplay's `add()` with health component (`entities/enemy.js`)
+- [x] Implement AI using Kaplay's `onUpdate()` for pathfinding logic (`systems/ai.js`)
+- [x] Add enemy sprites and animations using Kaplay's animation system (`entities/enemy.js`)
+- [x] Create enemy spawning using `spawn()` and level data integration (`systems/spawning.js`)
+- [x] Implement health system using custom health component (`components/health.js`)
+- [x] Define enemy types using Kaplay tags and custom components (`data/enemies.js`)
+- [x] **ENHANCED**: Fixed enemy positioning to be properly centered within grid cells
+- [x] **ENHANCED**: Implemented enemy AI behaviors (aggressive, skittish, guardian, passive)
+- [x] **ENHANCED**: Added enemy animation system with state-based color changes
+- [x] **ENHANCED**: Created comprehensive enemy spawning system with dynamic spawning
 
 ### 2.2 Combat Mechanics
 **Files: `systems/combat.js`, `systems/spells.js`, `components/health.js`**
-- [ ] Implement turn-based system using Kaplay's state management (`systems/combat.js`)
-- [ ] Create damage system using custom components and events (`systems/combat.js`)
-- [ ] Add combat animations using Kaplay's `play()` and animation chains (`systems/combat.js`)
-- [ ] Implement player health using Kaplay's health component (`components/health.js`)
-- [ ] Create spell system using Kaplay's action system and particle effects (`systems/spells.js`)
-- [ ] Add visual feedback using Kaplay's text objects and tweens (`systems/feedback.js`)
+- [x] Implement turn-based system using Kaplay's state management (`systems/combat.js`)
+- [x] Create damage system using custom components and events (`systems/combat.js`)
+- [x] Add combat animations using Kaplay's `play()` and animation chains (`systems/combat.js`)
+- [x] Implement player health using Kaplay's health component (`components/health.js`)
+- [x] Create spell system using Kaplay's action system and particle effects (`systems/spells.js`)
+- [x] Add visual feedback using Kaplay's text objects and tweens (`systems/feedback.js`)
+- [x] **ENHANCED**: Implemented comprehensive combat system with turn-based mechanics
+- [x] **ENHANCED**: Added visual combat effects (damage numbers, hit particles, camera shake)
+- [x] **ENHANCED**: Created damage calculation with attack/defense stats
+- [x] **ENHANCED**: Integrated combat state management and turn processing
 
 ### 2.3 Combat UI
 **Files: `ui/combat.js`, `ui/healthbars.js`, `scenes/gameover.js`**
-- [ ] Create health bars using Kaplay's rect and progress components (`ui/healthbars.js`)
-- [ ] Add floating health indicators using Kaplay's text and follow components (`ui/healthbars.js`)
-- [ ] Implement message system using Kaplay's text objects and queues (`ui/messages.js`)
-- [ ] Create spell UI using Kaplay's button components and mouse events (`ui/spells.js`)
-- [ ] Add turn indicators using Kaplay's sprite and visibility toggles (`ui/combat.js`)
-- [ ] Implement game over screen using Kaplay's scene transitions (`scenes/gameover.js`)
+- [x] Create health bars using Kaplay's rect and progress components (`ui/healthbars.js`)
+- [x] Add floating health indicators using Kaplay's text and follow components (`ui/healthbars.js`)
+- [x] Implement message system using Kaplay's text objects and queues (`ui/messages.js`)
+- [x] Create spell UI using Kaplay's button components and mouse events (`ui/spells.js`)
+- [x] Add turn indicators using Kaplay's sprite and visibility toggles (`ui/combat.js`)
+- [x] Implement game over screen using Kaplay's scene transitions (`scenes/gameover.js`)
+- [x] **ENHANCED**: Fixed all method call errors and null reference issues
+- [x] **ENHANCED**: Implemented dynamic visual health bar feedback with proper scaling
+- [x] **ENHANCED**: Added comprehensive combat message system with color coding
+- [x] **ENHANCED**: Created turn-based combat system preventing spam attacks
+- [x] **ENHANCED**: Fixed enemy double attack issue and combat flow
 
 ---
 
@@ -78,30 +91,83 @@ This document breaks down the Phase 1 (MVP) development tasks from section 9.1 o
 
 ### 3.1 Inventory Data Structure
 **Files: `systems/inventory.js`, `data/items.js`, `components/item.js`**
-- [ ] Create item objects using Kaplay's custom components with properties (`components/item.js`)
-- [ ] Implement inventory using Kaplay's data structures and arrays (`systems/inventory.js`)
-- [ ] Add item categories using Kaplay's tag system (`data/items.js`)
-- [ ] Create item definitions using Kaplay's asset loading system (`data/items.js`)
-- [ ] Implement weight/bulk tracking using custom component properties (`components/item.js`)
-- [ ] Add pickup mechanics using Kaplay's collision detection and events (`systems/pickup.js`)
+- [x] Create item objects using Kaplay's custom components with properties (`components/item.js`)
+- [x] Implement inventory using Kaplay's data structures and arrays (`systems/inventory.js`)
+- [x] Add item categories using Kaplay's tag system (`data/items.js`)
+- [x] Create item definitions using Kaplay's asset loading system (`data/items.js`)
+- [x] Implement weight/bulk tracking using custom component properties (`components/item.js`)
+- [x] Add pickup mechanics using Kaplay's collision detection and events (`systems/pickup.js`)
+- [x] **ENHANCED**: Items grant experience points when picked up
+- [x] **ENHANCED**: Complete item data system with rarity and experience values
+- [x] **ENHANCED**: Fixed all Kaplay component errors (lifespan/opacity requirements)
+- [x] **ENHANCED**: Proper item positioning centered within grid squares
+- [x] **ENHANCED**: Full weight/bulk tracking system with UI display and limits enforcement
+- [x] **ENHANCED**: MASSIVE EXPANSION: 60 slots (10x6 grid), 16 equipment slots, authentic Castles of Wind experience
 
 ### 3.2 Inventory UI
 **Files: `ui/inventory.js`, `ui/tooltip.js`, `scenes/inventory.js`**
-- [ ] Create inventory UI using Kaplay's rect and sprite components (`ui/inventory.js`)
-- [ ] Implement drag-and-drop using Kaplay's mouse events and object following (`ui/inventory.js`)
-- [ ] Add tooltips using Kaplay's text objects and mouse hover events (`ui/tooltip.js`)
-- [ ] Create equipment slots using Kaplay's UI positioning system (`ui/equipment.js`)
-- [ ] Implement context menus using Kaplay's button components and event handling (`ui/contextmenu.js`)
-- [ ] Add sorting features using Kaplay's array manipulation and UI updates (`ui/inventory.js`)
+- [x] Create inventory UI using Kaplay's rect and sprite components (`ui/inventory.js`)
+- [x] Implement drag-and-drop using Kaplay's mouse events and object following (`ui/inventory.js`)
+- [x] Add tooltips using Kaplay's text objects and mouse hover events (`ui/tooltip.js`)
+- [x] Create equipment slots using Kaplay's UI positioning system (`ui/equipment.js`)
+- [x] Implement context menus using Kaplay's button components and event handling (implemented inline in `ui/inventory.js`)
+- [x] Add sorting features using Kaplay's array manipulation and UI updates (`ui/inventory.js`)
+- [x] **ENHANCED**: Fixed inventory UI blank screen issue with proper text rendering
+- [x] **ENHANCED**: Implemented game pause functionality when inventory is open
+- [x] **ENHANCED**: Created overlay system instead of scene switching for better state management
+- [x] **ENHANCED**: Added comprehensive player stats display and equipment slots
+- [x] **ENHANCED**: Fixed all Kaplay v3001.0.0 compatibility issues with text rendering
+- [x] **ENHANCED**: Implemented proper inventory opening/closing with keyboard controls
+- [x] **ENHANCED**: EXPANDED: 700x500px UI, 16 equipment types (rings, cloaks, bracers, belts, etc.)
 
 ### 3.3 Item Interaction
 **Files: `systems/items.js`, `systems/equipment.js`, `entities/grounditem.js`**
-- [ ] Implement item usage using Kaplay's action system and custom events (`systems/items.js`)
-- [ ] Add item examination using Kaplay's text display and modal systems (`ui/examination.js`)
-- [ ] Create ground items using Kaplay's sprite objects with pickup areas (`entities/grounditem.js`)
+- [x] Implement item usage using Kaplay's action system and custom events (`systems/items.js`)
+- [x] Add item examination using Kaplay's text display and modal systems (`ui/examination.js`)
+- [x] Create ground items using Kaplay's sprite objects with pickup areas (`entities/grounditem.js`)
 - [ ] Implement item effects using Kaplay's component modification system (`systems/items.js`)
-- [ ] Add stat bonuses using Kaplay's custom component updates (`systems/equipment.js`)
-- [ ] Create stacking using Kaplay's object grouping and count properties (`systems/inventory.js`)
+- [x] Add stat bonuses using Kaplay's custom component updates (`systems/equipment.js`)
+- [x] Create stacking using Kaplay's object grouping and count properties (`systems/inventory.js`)
+- [x] **ENHANCED**: Ground items spawn correctly with proper visual effects
+- [x] **ENHANCED**: Pickup system with experience gain and visual feedback
+- [x] **ENHANCED**: Item pickup messages with experience point display
+- [x] **ENHANCED**: Fixed all pickup system errors and component issues
+
+#### 3.3.1 Item Effects — Design and Implementation Plan
+**Goal**: Enable consumables and special items to modify entity components (instant and timed effects) safely and with clear feedback.
+
+**Data Model (data/items.js)**
+- [ ] Add `effects` array to consumable items (e.g., health/mana potions, antidotes, stat elixirs):
+  - Shape: `{ type: "heal"|"mana"|"buff_stat"|"cure"|"shield"|"regen"|"damage", stat?: "attack"|"defense"|"speed"|"dexterity"|"strength", amount: number, durationMs?: number }`
+- [ ] Example definitions: Health Potion (heal), Mana Potion (mana), Antidote (cure: "poison"), Strength Elixir (buff_stat+duration), Shield Tonic (shield+duration), Regen Draught (regen+duration)
+
+**Systems (systems/items.js)**
+- [ ] Implement `applyItemEffects(item, target)` to iterate `effects` and modify target components with null-safety
+- [ ] Instant effects: heal/mana/damage adjust `Health`/`Mana` components; clamp to min/max; update HealthBarUI
+- [ ] Timed effects: add/update `StatusEffectComponent` entries with `{ type, amount, expiresAt }`
+- [ ] Cures: remove matching status entries (e.g., poison, slow)
+- [ ] Emit messages via `ui/messages.js` for each applied/removed effect
+- [ ] Robust logging for effect application, clamping, and expirations
+
+**Status Effect Processing (shared/integration)**
+- [ ] Create lightweight `StatusEffectComponent` for entities (player + enemies) to hold active timed effects
+- [ ] Central tick: reuse/integrate with MagicSystem processing loop to avoid duplicate processing; 500ms cadence OK
+- [ ] On expiry: revert stat deltas, remove effect, refresh UI; ensure clean-up if entity destroyed
+
+**UI & Feedback**
+- [ ] Update `ui/examination.js` and tooltips to show effect summaries (e.g., "+15 HP", "+2 STR for 30s")
+- [ ] Ensure inventory Use → effect application path shows result messages and refreshes inventory/UI immediately
+- [ ] Add subtle FX for effects (sparkle/flash) using `k.opacity()` + `lifespan` to satisfy Kaplay deps
+
+**Validation & Safety**
+- [ ] All property access guarded (item, stats, components) to prevent null/undefined errors
+- [ ] Effects stack rules: define merging (e.g., refresh duration vs. additive) per type; document
+- [ ] Prevent using non-usable items; respect quantities and stack consumption
+
+**Testing & Acceptance**
+- [ ] Add debug grants (cheats) to spawn each test consumable quickly
+- [ ] Verify: HP/MP clamps; buffs apply and expire; cures remove statuses; UI updates; no console errors
+- [ ] Verify integration: combat turn flow unaffected; pause/resume unaffected; input handler lifecycle clean
 
 ---
 
@@ -140,21 +206,21 @@ This document breaks down the Phase 1 (MVP) development tasks from section 9.1 o
 
 ### Project Setup
 **Files: `package.json`, `index.html`, `main.js`, `.gitignore`**
-- [ ] Initialize project with Kaplay via CDN or npm installation (`package.json`, `index.html`)
-- [ ] Set up version control (Git) with .gitignore for node_modules (`.gitignore`)
-- [ ] Create HTML page with Kaplay canvas initialization (`index.html`)
-- [ ] Configure Kaplay with proper game settings and plugins (`main.js`, `config.js`)
-- [ ] Set up Kaplay's built-in error handling and debug mode (`main.js`)
-- [ ] Create development server (live-server or Vite for Kaplay) (`package.json`)
+- [x] Initialize project with Kaplay via CDN or npm installation (`package.json`, `index.html`)
+- [x] Set up version control (Git) with .gitignore for node_modules (`.gitignore`)
+- [x] Create HTML page with Kaplay canvas initialization (`index.html`)
+- [x] Configure Kaplay with proper game settings and plugins (`main.js`, `config.js`)
+- [x] Set up Kaplay's built-in error handling and debug mode (`main.js`)
+- [x] Create development server (live-server or Vite for Kaplay) (`package.json`)
 
 ### Core Systems
 **Files: `main.js`, `scenes/`, `utils/input.js`, `utils/audio.js`**
-- [ ] Initialize Kaplay game loop with proper scene management (`main.js`)
-- [ ] Set up input handling using Kaplay's built-in input system (`utils/input.js`)
-- [ ] Implement scene management using Kaplay's scene system (`scenes/menu.js`, `scenes/game.js`)
+- [x] Initialize Kaplay game loop with proper scene management (`main.js`)
+- [x] Set up input handling using Kaplay's built-in input system (`utils/input.js`)
+- [x] Implement scene management using Kaplay's scene system (`scenes/menu.js`, `scenes/game.js`)
 - [ ] Add audio using Kaplay's `loadSound()` and `play()` functions (`utils/audio.js`)
-- [ ] Use Kaplay's built-in math utilities and random functions (`utils/math.js`)
-- [ ] Enable Kaplay's performance monitoring and debug info (`main.js`)
+- [x] Use Kaplay's built-in math utilities and random functions (`utils/math.js`)
+- [x] Enable Kaplay's performance monitoring and debug info (`main.js`)
 
 ### Testing and Debug
 **Files: `debug/`, `utils/debug.js`, `utils/saveload.js`**
@@ -170,20 +236,20 @@ This document breaks down the Phase 1 (MVP) development tasks from section 9.1 o
 ## Acceptance Criteria for Phase 1 MVP
 
 ### Minimum Viable Product Must Include:
-- [ ] Player can move around a single dungeon level using mouse or keyboard
-- [ ] Player can engage in turn-based combat with at least 2 enemy types
-- [ ] Player can pick up, use, and manage items in a basic inventory
+- [x] Player can move around a single dungeon level using mouse or keyboard
+- [x] Player can engage in turn-based combat with at least 2 enemy types
+- [x] Player can pick up, use, and manage items in a basic inventory
 - [ ] Player can cast at least 2-3 different spells
 - [ ] Player can complete the level by reaching an exit or defeating all enemies
-- [ ] Game has basic UI showing health, inventory, and spell options
-- [ ] Game runs smoothly at 60 FPS in modern web browsers
+- [x] Game has basic UI showing health, inventory, and spell options
+- [x] Game runs smoothly at 60 FPS in modern web browsers
 
 ### Success Metrics:
 - [ ] Complete playthrough possible from start to level completion
-- [ ] No game-breaking bugs or crashes during normal gameplay
-- [ ] Intuitive controls that new players can understand quickly
-- [ ] Performance remains stable during combat and movement
-- [ ] All core systems work together without conflicts
+- [x] No game-breaking bugs or crashes during normal gameplay
+- [x] Intuitive controls that new players can understand quickly
+- [x] Performance remains stable during combat and movement
+- [x] All core systems work together without conflicts
 
 ---
 

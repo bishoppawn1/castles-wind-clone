@@ -47,6 +47,40 @@ export const LevelSystem = {
         return true;
     },
     
+    // Load a level directly from provided data (procedural or dynamic)
+    loadLevelData(k, levelData) {
+        console.log(`Loading level from data object...`);
+        
+        // Clear existing level
+        this.unloadLevel(k);
+        
+        if (!levelData || !levelData.layout) {
+            console.error('Invalid level data provided to loadLevelData');
+            return false;
+        }
+        
+        this.currentLevel = levelData.id || 'procedural';
+        this.currentLevelData = levelData;
+        
+        // Create tiles
+        this.createLevelTiles(k, levelData);
+        
+        // Spawn items
+        this.spawnLevelItems(k, levelData);
+        
+        // Spawn enemies
+        this.spawnLevelEnemies(k, levelData);
+        
+        // Apply lighting
+        this.applyLighting(k, levelData);
+        
+        // Initialize fog of war
+        this.initializeFogOfWar(k, levelData);
+        
+        console.log(`Level ${this.currentLevel} loaded successfully (from data)`);
+        return true;
+    },
+    
     // Unload current level
     unloadLevel(k) {
         if (!this.currentLevel) return;
@@ -84,13 +118,25 @@ export const LevelSystem = {
     
     // Create tiles for the level
     createLevelTiles(k, levelData) {
-        for (let y = 0; y < levelData.layout.length; y++) {
-            for (let x = 0; x < levelData.layout[y].length; x++) {
-                const symbol = levelData.layout[y][x];
+        const layout = levelData?.layout;
+        if (!Array.isArray(layout)) {
+            console.error("Invalid level data: layout must be an array");
+            return;
+        }
+        const tileSize = (typeof levelData?.tileSize === "number" && levelData.tileSize > 0) ? levelData.tileSize : 32;
+        
+        for (let y = 0; y < layout.length; y++) {
+            const row = layout[y];
+            if (!(typeof row === "string" || Array.isArray(row))) {
+                console.warn(`Skipping invalid layout row at y=${y}`);
+                continue;
+            }
+            for (let x = 0; x < row.length; x++) {
+                const symbol = row[x];
                 const tileType = TILE_SYMBOLS[symbol];
                 
                 if (tileType && !this.isEntitySymbol(symbol)) {
-                    const tile = TileSystem.createTile(k, tileType, x, y, levelData.tileSize);
+                    const tile = TileSystem.createTile(k, tileType, x, y, tileSize);
                     if (tile) {
                         this.levelTiles.push(tile);
                     }
@@ -109,29 +155,65 @@ export const LevelSystem = {
     
     // Spawn items from level data
     spawnLevelItems(k, levelData) {
+        // Basic guards
+        if (!k || typeof k.add !== "function") {
+            console.error('Kaboom context "k" is not ready in spawnLevelItems');
+            return;
+        }
+        const layout = levelData?.layout;
+        if (!Array.isArray(layout)) {
+            console.error("Invalid level data: layout must be an array");
+            return;
+        }
+        const tileSize = (typeof levelData?.tileSize === "number" && levelData.tileSize > 0) ? levelData.tileSize : 32;
+        
+        // Track spawned positions to avoid duplicates across sources
+        const spawned = new Set();
+        
         // Spawn items from layout symbols
-        for (let y = 0; y < levelData.layout.length; y++) {
-            for (let x = 0; x < levelData.layout[y].length; x++) {
-                const symbol = levelData.layout[y][x];
+        for (let y = 0; y < layout.length; y++) {
+            const row = layout[y];
+            if (!(typeof row === "string" || Array.isArray(row))) {
+                console.warn(`Skipping invalid layout row at y=${y}`);
+                continue;
+            }
+            for (let x = 0; x < row.length; x++) {
+                const symbol = row[x];
                 const itemType = this.getItemTypeFromSymbol(symbol);
                 
                 if (itemType) {
-                    const item = this.createItem(k, itemType, x, y, levelData.tileSize);
+                    const key = `${itemType}@${x},${y}`;
+                    if (spawned.has(key)) continue;
+                    const item = this.createItem(k, itemType, x, y, tileSize);
                     if (item) {
                         this.levelItems.push(item);
+                        spawned.add(key);
                     }
                 }
             }
         }
         
-        // Spawn items from level data
-        if (levelData.items) {
+        // Spawn items from explicit level data
+        if (Array.isArray(levelData?.items)) {
             levelData.items.forEach(itemData => {
-                const item = this.createItem(k, itemData.type, itemData.x, itemData.y, levelData.tileSize, itemData);
+                if (!itemData || typeof itemData.x !== "number" || typeof itemData.y !== "number") {
+                    console.warn("Skipping invalid itemData entry:", itemData);
+                    return;
+                }
+                const itemType = itemData.type;
+                const key = `${itemType}@${itemData.x},${itemData.y}`;
+                if (spawned.has(key)) {
+                    // Avoid duplicate spawn
+                    return;
+                }
+                const item = this.createItem(k, itemType, itemData.x, itemData.y, tileSize, itemData);
                 if (item) {
                     this.levelItems.push(item);
+                    spawned.add(key);
                 }
             });
+        } else if (levelData?.items) {
+            console.warn("levelData.items is not an array; skipping items spawn");
         }
         
         console.log(`Spawned ${this.levelItems.length} items`);
@@ -195,29 +277,65 @@ export const LevelSystem = {
     
     // Spawn enemies from level data
     spawnLevelEnemies(k, levelData) {
+        // Basic guards
+        if (!k || typeof k.add !== "function") {
+            console.error('Kaboom context "k" is not ready in spawnLevelEnemies');
+            return;
+        }
+        const layout = levelData?.layout;
+        if (!Array.isArray(layout)) {
+            console.error("Invalid level data: layout must be an array");
+            return;
+        }
+        const tileSize = (typeof levelData?.tileSize === "number" && levelData.tileSize > 0) ? levelData.tileSize : 32;
+        
+        // Track spawned positions to avoid duplicates across sources
+        const spawned = new Set();
+        
         // Spawn enemies from layout symbols
-        for (let y = 0; y < levelData.layout.length; y++) {
-            for (let x = 0; x < levelData.layout[y].length; x++) {
-                const symbol = levelData.layout[y][x];
+        for (let y = 0; y < layout.length; y++) {
+            const row = layout[y];
+            if (!(typeof row === "string" || Array.isArray(row))) {
+                console.warn(`Skipping invalid layout row at y=${y}`);
+                continue;
+            }
+            for (let x = 0; x < row.length; x++) {
+                const symbol = row[x];
                 const enemyType = this.getEnemyTypeFromSymbol(symbol);
                 
                 if (enemyType) {
-                    const enemy = this.createEnemy(k, enemyType, x, y, levelData.tileSize);
+                    const key = `${enemyType}@${x},${y}`;
+                    if (spawned.has(key)) continue;
+                    const enemy = this.createEnemy(k, enemyType, x, y, tileSize);
                     if (enemy) {
                         this.levelEnemies.push(enemy);
+                        spawned.add(key);
                     }
                 }
             }
         }
         
-        // Spawn enemies from level data
-        if (levelData.enemies) {
+        // Spawn enemies from explicit level data
+        if (Array.isArray(levelData?.enemies)) {
             levelData.enemies.forEach(enemyData => {
-                const enemy = this.createEnemy(k, enemyData.type, enemyData.x, enemyData.y, levelData.tileSize, enemyData);
+                if (!enemyData || typeof enemyData.x !== "number" || typeof enemyData.y !== "number") {
+                    console.warn("Skipping invalid enemyData entry:", enemyData);
+                    return;
+                }
+                const enemyType = enemyData.type;
+                const key = `${enemyType}@${enemyData.x},${enemyData.y}`;
+                if (spawned.has(key)) {
+                    // Avoid duplicate spawn
+                    return;
+                }
+                const enemy = this.createEnemy(k, enemyType, enemyData.x, enemyData.y, tileSize, enemyData);
                 if (enemy) {
                     this.levelEnemies.push(enemy);
+                    spawned.add(key);
                 }
             });
+        } else if (levelData?.enemies) {
+            console.warn("levelData.enemies is not an array; skipping enemies spawn");
         }
         
         console.log(`Spawned ${this.levelEnemies.length} enemies`);
@@ -280,7 +398,7 @@ export const LevelSystem = {
         
         // Apply ambient lighting to all tiles
         this.levelTiles.forEach(tile => {
-            TileSystem.addLighting(tile, ambient);
+            TileSystem.addLighting(k, tile, ambient);
         });
         
         // Apply torch lighting
@@ -309,8 +427,8 @@ export const LevelSystem = {
             {
                 gridX: torch.x,
                 gridY: torch.y,
-                radius: torchRadius,
-                intensity: torchIntensity
+                lightRadius: torchRadius,
+                lightIntensity: torchIntensity
             }
         ]);
         
@@ -331,7 +449,7 @@ export const LevelSystem = {
                     
                     if (tile) {
                         const lightIntensity = torchIntensity * (1 - distance / torchRadius);
-                        TileSystem.addLighting(tile, 1 + lightIntensity);
+                        TileSystem.addLighting(k, tile, 1 + lightIntensity);
                     }
                 }
             }
@@ -374,6 +492,76 @@ export const LevelSystem = {
                 }
             }
         }
+
+        // After revealing tiles, sync entity visibility (items, enemies) to fog of war
+        try {
+            this.updateEntityVisibility(k, playerGridX, playerGridY);
+        } catch (e) {
+            console.warn("updateEntityVisibility failed:", e);
+        }
+    },
+    
+    // Update visibility/opacity of non-tile entities based on fog of war
+    updateEntityVisibility(k, playerGridX, playerGridY) {
+        if (!this.currentLevelData?.fogOfWar?.enabled) return;
+        const fog = this.currentLevelData.fogOfWar;
+        const dims = LevelUtils.getDimensions(this.currentLevelData);
+        const tileSize = dims.tileSize || 32;
+
+        // Helper: derive grid position for an object
+        const toGrid = (obj) => {
+            if (typeof obj.gridX === "number" && typeof obj.gridY === "number") {
+                return { x: obj.gridX, y: obj.gridY };
+            }
+            if (obj.pos) {
+                // Most world entities are centered in tiles; floor works even with small bobbing
+                return {
+                    x: Math.floor(obj.pos.x / tileSize),
+                    y: Math.floor(obj.pos.y / tileSize),
+                };
+            }
+            return null;
+        };
+
+        const applyVisibility = (obj) => {
+            const g = toGrid(obj);
+            if (!g) return;
+            const dx = g.x - playerGridX;
+            const dy = g.y - playerGridY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            // Determine base alpha by distance to player
+            let alpha = 1;
+            if (dist <= fog.visionRadius) {
+                alpha = 1;
+            } else {
+                // Dim entities in explored-but-not-currently-visible tiles
+                alpha = Math.max(0, (fog.exploredOpacity ?? 0.4));
+            }
+
+            // Completely hide entities in fully unexplored tiles
+            const tile = TileSystem.getTileAt(k, g.x, g.y);
+            const tileOpacity = tile?.opacity ?? 1;
+            const unexplored = (fog.unexploredOpacity != null)
+                ? (tileOpacity <= (fog.unexploredOpacity + 0.01))
+                : false;
+
+            obj.opacity = (unexplored && dist > fog.visionRadius) ? 0 : alpha;
+        };
+
+        // Ground items (rich item entities)
+        const groundItems = k.get("ground_item") || [];
+        groundItems.forEach(applyVisibility);
+
+        // Legacy/simple level items (spawned with gridX/gridY)
+        const simpleItems = (k.get("item") || []).filter((it) =>
+            typeof it.gridX === "number" && typeof it.gridY === "number"
+        );
+        simpleItems.forEach(applyVisibility);
+
+        // Enemies
+        const enemies = k.get("enemy") || [];
+        enemies.forEach(applyVisibility);
     },
     
     // Get player spawn position for current level
@@ -393,3 +581,10 @@ export const LevelSystem = {
         return LevelUtils.getDimensions(this.currentLevelData);
     }
 };
+
+// Expose to global for non-module access (e.g., main.js)
+if (typeof window !== 'undefined') {
+    window.LevelSystem = LevelSystem;
+    window.LevelUtils = LevelUtils;
+    window.TILE_SYMBOLS = TILE_SYMBOLS;
+}

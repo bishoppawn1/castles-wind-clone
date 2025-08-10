@@ -57,18 +57,44 @@
     <!-- Load game state manager -->
     <script src="systems/gamestate.js"></script>
     
-    <!-- Load player entity -->
-    <script src="entities/player.js"></script>
+    <!-- Load components -->
+    <script src="components/health.js"></script>
+    <script src="components/item.js"></script>
     
-    <!-- Load menu scene -->
+    <!-- Load data files -->
+    <script src="data/enemies.js"></script>
+    <script src="data/items.js"></script>
+    <script src="data/spells.js"></script>
+    <script src="entities/enemy.js"></script>
+    <script src="systems/ai.js"></script>
+    <script src="systems/spawning.js"></script>
+    
+    <!-- Load systems -->
+    <script src="systems/combat.js"></script>
+    <script src="systems/inventory.js"></script>
+    <script src="systems/pickup.js"></script>
+    <script src="systems/magic.js"></script>
+    
+    <!-- Load scenes -->
     <script src="scenes/menu.js"></script>
-    
-    <!-- Load inventory scene -->
     <script src="scenes/inventory.js"></script>
+    <script src="scenes/gameover.js"></script>
+    <script src="ui/healthbars.js"></script>
+    <script src="ui/messages.js"></script>
+    <script src="ui/combat.js"></script>
+    <script src="ui/tooltip.js"></script>
+    <script src="ui/inventory.js"></script>
+    <script src="ui/spells.js"></script>
+    
+    <!-- Load entities -->
+    <script src="entities/player.js"></script>
+    <script src="entities/grounditem.js"></script>
     
     <!-- Load level system -->
     <script src="data/levels.js" type="module"></script>
     <script src="data/tiles.js" type="module"></script>
+    <!-- Procedural dungeon generator (module + global) -->
+    <script src="systems/dungeon.js" type="module"></script>
     <script src="systems/level.js" type="module"></script>
     
     <!-- Load our game -->

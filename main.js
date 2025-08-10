@@ -135,9 +135,257 @@ if (GAME_CONFIG.DEBUG_MODE) {
     });
 }
 
+// Function to spawn test enemies for spell testing
+function spawnTestEnemies(k) {
+    console.log('👹 Spawning test enemies for spell testing...');
+    
+    const player = k.get('player')[0];
+    if (!player) {
+        console.error('❌ No player found for enemy spawning');
+        return;
+    }
+    
+    const playerGridPos = {
+        x: Math.floor(player.pos.x / 32),
+        y: Math.floor(player.pos.y / 32)
+    };
+    
+    // Simple enemy data for testing
+    const testEnemyType = {
+        id: 'test_goblin',
+        name: 'Test Goblin',
+        sprite: {
+            size: 20,
+            color: [100, 180, 100],
+            shape: 'rect'
+        },
+        stats: {
+            health: 25,
+            maxHealth: 25,
+            attack: 8,
+            defense: 2,
+            experience: 15, // Matches standard goblin experience
+            gold: 5
+        }
+    };
+    
+    // Spawn enemies in a circle around the player
+    const spawnPositions = [
+        { x: playerGridPos.x + 3, y: playerGridPos.y },     // Right
+        { x: playerGridPos.x - 3, y: playerGridPos.y },     // Left  
+        { x: playerGridPos.x, y: playerGridPos.y + 3 },     // Down
+        { x: playerGridPos.x, y: playerGridPos.y - 3 },     // Up
+        { x: playerGridPos.x + 2, y: playerGridPos.y + 2 }, // Bottom-right
+        { x: playerGridPos.x - 2, y: playerGridPos.y - 2 }  // Top-left
+    ];
+    
+    spawnPositions.forEach((pos, index) => {
+        const enemy = k.add([
+            k.rect(testEnemyType.sprite.size, testEnemyType.sprite.size),
+            k.pos(pos.x * 32 + 16, pos.y * 32 + 16),
+            k.anchor('center'),
+            k.color(...testEnemyType.sprite.color),
+            k.z(100),
+            {
+                name: `${testEnemyType.name} ${index + 1}`,
+                health: testEnemyType.stats.health,
+                maxHealth: testEnemyType.stats.maxHealth,
+                gridX: pos.x,
+                gridY: pos.y,
+                enemyId: `test_goblin_${index}`,
+                enemyType: testEnemyType,
+                isDead: false,
+                attack: testEnemyType.stats.attack,
+                defense: testEnemyType.stats.defense,
+                
+                // Movement AI properties
+                aiState: 'wander',
+                moveTimer: 0,
+                moveInterval: 1 + Math.random() * 2, // Random movement interval 1-3 seconds
+                targetDirection: null,
+                moveSpeed: 50, // pixels per second
+                isMoving: false,
+                facing: 'down',
+                
+                takeDamage(amount) {
+                    const actualDamage = Math.max(1, amount - (this.defense || 0));
+                    this.health = Math.max(0, this.health - actualDamage);
+                    console.log(`💥 ${this.name} took ${actualDamage} damage! Health: ${this.health}/${this.maxHealth}`);
+                    
+                    // Flash red when taking damage
+                    this.color = k.rgb(255, 100, 100);
+                    k.wait(0.2, () => {
+                        if (this.health > 0) {
+                            this.color = k.rgb(...testEnemyType.sprite.color);
+                        }
+                    });
+                    
+                    if (this.health <= 0) {
+                        console.log(`☠️ ${this.name} defeated!`);
+                        this.isDead = true;
+
+                        // Award XP and gold to the player (mirrors standard enemy death behavior)
+                        const playerRef = window.currentPlayer || window.player || (window.GameState && window.GameState.player);
+                        const xp = testEnemyType.stats.experience || 15;
+                        const gold = testEnemyType.stats.gold || 0;
+                        if (playerRef && typeof playerRef.gainExperience === 'function') {
+                            try {
+                                playerRef.gainExperience(xp);
+                                playerRef.gold = (playerRef.gold || 0) + gold;
+                                console.log(`⭐ Player gained ${xp} XP and ${gold} gold from ${this.name}!`);
+                            } catch (e) {
+                                console.warn('Failed to award XP/gold from test goblin:', e);
+                            }
+                        } else {
+                            console.warn('No valid player reference to award XP for test goblin');
+                        }
+                        // Update inventory/UI if available
+                        if (window.inventory && typeof window.inventory.updatePlayerStats === 'function') {
+                            window.inventory.updatePlayerStats();
+                        }
+
+                        this.destroy();
+                    }
+                    
+                    return actualDamage;
+                },
+                
+                // Movement and AI methods
+                update() {
+                    if (this.isDead) return;
+                    
+                    this.moveTimer += k.dt();
+                    
+                    // Handle movement AI
+                    if (this.aiState === 'wander') {
+                        if (this.moveTimer >= this.moveInterval) {
+                            this.chooseRandomDirection();
+                            this.moveTimer = 0;
+                            this.moveInterval = 1 + Math.random() * 2; // New random interval
+                        }
+                        
+                        if (this.targetDirection && !this.isMoving) {
+                            this.startMoving();
+                        }
+                    }
+                    
+                    // Update movement
+                    if (this.isMoving && this.targetDirection) {
+                        this.updateMovement();
+                    }
+                },
+                
+                chooseRandomDirection() {
+                    const directions = ['up', 'down', 'left', 'right'];
+                    const randomDir = directions[Math.floor(Math.random() * directions.length)];
+                    
+                    // 30% chance to stop moving
+                    if (Math.random() < 0.3) {
+                        this.targetDirection = null;
+                        this.isMoving = false;
+                        return;
+                    }
+                    
+                    this.targetDirection = randomDir;
+                    this.facing = randomDir;
+                    console.log(`👹 ${this.name} choosing direction: ${randomDir}`);
+                },
+                
+                startMoving() {
+                    if (!this.targetDirection) return;
+                    
+                    const directions = {
+                        up: { x: 0, y: -1 },
+                        down: { x: 0, y: 1 },
+                        left: { x: -1, y: 0 },
+                        right: { x: 1, y: 0 }
+                    };
+                    
+                    const dir = directions[this.targetDirection];
+                    const newGridX = this.gridX + dir.x;
+                    const newGridY = this.gridY + dir.y;
+                    
+                    // Check if new position is valid (not wall, within bounds)
+                    if (this.canMoveTo(newGridX, newGridY)) {
+                        this.isMoving = true;
+                        this.targetGridX = newGridX;
+                        this.targetGridY = newGridY;
+                        this.moveStartTime = Date.now();
+                        this.moveStartPos = { x: this.pos.x, y: this.pos.y };
+                    } else {
+                        // Can't move there, stop
+                        this.targetDirection = null;
+                        this.isMoving = false;
+                    }
+                },
+                
+                canMoveTo(gridX, gridY) {
+                    // Check bounds
+                    if (gridX < 1 || gridX > 45 || gridY < 1 || gridY > 32) return false;
+                    
+                    // Check for walls (simple check)
+                    const tiles = k.get('tile');
+                    for (let tile of tiles) {
+                        if (tile.gridX === gridX && tile.gridY === gridY && tile.solid) {
+                            return false;
+                        }
+                    }
+                    
+                    // Check for other enemies at that position
+                    const enemies = k.get('enemy');
+                    for (let enemy of enemies) {
+                        if (enemy !== this && enemy.gridX === gridX && enemy.gridY === gridY) {
+                            return false;
+                        }
+                    }
+                    
+                    return true;
+                },
+                
+                updateMovement() {
+                    const moveTime = Date.now() - this.moveStartTime;
+                    const moveDuration = 500; // 500ms to move one tile
+                    const progress = Math.min(moveTime / moveDuration, 1);
+                    
+                    // Interpolate position
+                    const targetPixelX = this.targetGridX * 32 + 16;
+                    const targetPixelY = this.targetGridY * 32 + 16;
+                    
+                    this.pos.x = this.moveStartPos.x + (targetPixelX - this.moveStartPos.x) * progress;
+                    this.pos.y = this.moveStartPos.y + (targetPixelY - this.moveStartPos.y) * progress;
+                    
+                    // Movement complete
+                    if (progress >= 1) {
+                        this.gridX = this.targetGridX;
+                        this.gridY = this.targetGridY;
+                        this.pos.x = targetPixelX;
+                        this.pos.y = targetPixelY;
+                        this.isMoving = false;
+                        this.targetDirection = null;
+                        
+                        console.log(`👹 ${this.name} moved to (${this.gridX}, ${this.gridY})`);
+                    }
+                }
+            },
+            'enemy'
+        ]);
+        
+        console.log(`👹 Spawned ${enemy.name} at (${pos.x}, ${pos.y})`);
+    });
+    
+    if (window.MessageSystem) {
+        window.MessageSystem.addMessage('Test enemies spawned! Press T again for more.', 'info');
+    }
+}
+
 // Menu scene is loaded from scenes/menu.js with proper New Game state reset functionality
 if (typeof createMenuScene === 'function') {
     createMenuScene(k);
+}
+
+// Game over scene is loaded from scenes/gameover.js
+if (typeof createGameOverScene === 'function') {
+    createGameOverScene(k);
 }
 
 // Demo level creation function (temporary until level system is fully integrated)
@@ -222,9 +470,162 @@ function createDemoLevel(k) {
 
 // Create a game scene with camera system and larger world
 k.scene("game", () => {
+    console.log('📍 GAME SCENE STARTED - This should appear first!');
+    
+    // Initialize enemy systems FIRST
+    console.log('📍 Enemy system initialization at game scene start...');
+    console.log('🔍 ENEMY_TYPES available:', typeof window.ENEMY_TYPES !== 'undefined');
+    console.log('🔍 EnemyEntity available:', typeof window.EnemyEntity !== 'undefined');
+    console.log('🔍 AISystem available:', typeof window.AISystem !== 'undefined');
+    console.log('🔍 SpawningSystem available:', typeof window.SpawningSystem !== 'undefined');
+    
+    if (window.AISystem) {
+        try {
+            AISystem.init(k);
+            console.log('✅ AISystem initialized successfully');
+        } catch (error) {
+            console.error('❌ AISystem initialization failed:', error);
+        }
+    } else {
+        console.error('❌ AISystem not available');
+    }
+    
+    if (window.SpawningSystem) {
+        try {
+            SpawningSystem.init(k);
+            console.log('✅ SpawningSystem initialized successfully');
+        } catch (error) {
+            console.error('❌ SpawningSystem initialization failed:', error);
+        }
+    } else {
+        console.error('❌ SpawningSystem not available');
+    }
+    
+    if (window.CombatSystem) {
+        try {
+            CombatSystem.init(k);
+            console.log('✅ CombatSystem initialized successfully');
+        } catch (error) {
+            console.error('❌ CombatSystem initialization failed:', error);
+        }
+    } else {
+        console.error('❌ CombatSystem not available');
+    }
+    
+    // Initialize inventory system
+    if (window.InventorySystem) {
+        try {
+            window.inventory = new InventorySystem(k, 60, 150, 80); // 60 slots, 150kg, 80 bulk
+            console.log('✅ InventorySystem initialized successfully');
+        } catch (error) {
+            console.error('❌ InventorySystem initialization failed:', error);
+        }
+    } else {
+        console.error('❌ InventorySystem not available');
+    }
+    
+    // Initialize pickup system
+    if (window.PickupSystem) {
+        try {
+            window.pickupSystem = new PickupSystem(k);
+            console.log('✅ PickupSystem initialized successfully');
+        } catch (error) {
+            console.error('❌ PickupSystem initialization failed:', error);
+        }
+    } else {
+        console.error('❌ PickupSystem not available');
+    }
+    
+    // Initialize UI systems
+    if (window.HealthBarUI) {
+        try {
+            HealthBarUI.init(k);
+            console.log('✅ HealthBarUI initialized successfully');
+        } catch (error) {
+            console.error('❌ HealthBarUI initialization failed:', error);
+        }
+    }
+    
+    if (window.MessageUI) {
+        try {
+            MessageUI.init(k);
+            console.log('✅ MessageUI initialized successfully');
+        } catch (error) {
+            console.error('❌ MessageUI initialization failed:', error);
+        }
+    }
+    
+    if (window.CombatUI) {
+        try {
+            CombatUI.init(k);
+            console.log('✅ CombatUI initialized successfully');
+        } catch (error) {
+            console.error('❌ CombatUI initialization failed:', error);
+        }
+    }
+    
+    // Initialize tooltip UI
+    if (window.TooltipUIClass) {
+        try {
+            window.TooltipUI = new TooltipUIClass(k);
+            console.log('✅ TooltipUI initialized successfully');
+        } catch (error) {
+            console.error('❌ TooltipUI initialization failed:', error);
+        }
+    } else {
+        console.error('❌ TooltipUI not available');
+    }
+    
+    // Initialize inventory UI
+    if (window.InventoryUI) {
+        try {
+            window.inventoryUI = new InventoryUI(k);
+            console.log('✅ InventoryUI initialized successfully');
+        } catch (error) {
+            console.error('❌ InventoryUI initialization failed:', error);
+        }
+    } else {
+        console.error('❌ InventoryUI not available');
+    }
+    
+    // Initialize magic system
+    console.log('🔍 Checking magic system availability...');
+    console.log('🔍 window.MagicSystem:', typeof window.MagicSystem);
+    console.log('🔍 window.SpellData:', typeof window.SpellData);
+    
+    if (window.MagicSystem) {
+        try {
+            console.log('🔮 Creating MagicSystem instance...');
+            window.magicSystem = new MagicSystem(k);
+            console.log('✅ Magic system initialized successfully');
+        } catch (error) {
+            console.error('❌ Magic system initialization failed:', error);
+        }
+    } else {
+        console.error('❌ Magic system not available - class not found');
+    }
+    
+    // Initialize spell UI
+    if (window.SpellUI) {
+        try {
+            window.spellUI = new SpellUI(k);
+            console.log('✅ Spell UI initialized successfully');
+        } catch (error) {
+            console.error('❌ Spell UI initialization failed:', error);
+        }
+    } else {
+        console.error('❌ Spell UI not available');
+    }
+    
     // Initialize game state manager
     if (!GameState.isInitialized) {
         GameState.init();
+    }
+    
+    // Add inventory system to game state
+    if (window.inventory) {
+        GameState.inventory = window.inventory;
+        console.log('✅ Inventory system added to GameState');
     }
     
     // Check if we're returning from inventory and have saved state
@@ -280,9 +681,25 @@ k.scene("game", () => {
         GRID_HEIGHT: 38
     });
     
-    // Create simple level tiles for demonstration
-    // This will be replaced by the level system
-    createDemoLevel(k);
+    // Procedural dungeon: generate and load
+    try {
+        const DG = (typeof window !== "undefined" && window.DungeonGenerator) ? window.DungeonGenerator : DungeonGenerator;
+        const levelData = DG.generate(50, 38, { tileSize: 32 });
+        console.log("🧭 Generated procedural dungeon level", { width: 50, height: 38, tileSize: 32 });
+        if (window.LevelSystem && typeof LevelSystem.loadLevelData === "function") {
+            LevelSystem.loadLevelData(k, levelData);
+        } else {
+            console.error("❌ LevelSystem not available; cannot load generated level");
+        }
+        // Store for inspection
+        window.currentLevelData = levelData;
+    } catch (err) {
+        console.error("❌ Dungeon generation failed; falling back to LEVEL_1", err);
+        if (window.LevelSystem && typeof LevelSystem.loadLevel === "function") {
+            LevelSystem.loadLevel(k, 1);
+            window.currentLevelData = LevelSystem.currentLevelData;
+        }
+    }
     
     // Draw debug grid (optional)
     let levelGridVisible = false;
@@ -293,20 +710,153 @@ k.scene("game", () => {
         });
     }
     
-    // Create player using PlayerEntity system
-    const playerGridPos = { x: 23, y: 17 }; // Center of ~47x34 grid
+    // Create player at dungeon spawn
+    const spawn = (window.LevelSystem && typeof LevelSystem.getPlayerSpawn === "function")
+        ? LevelSystem.getPlayerSpawn()
+        : (window.currentLevelData && window.currentLevelData.playerSpawn) ? window.currentLevelData.playerSpawn : { x: 23, y: 17 };
+    const playerGridPos = { x: spawn.x, y: spawn.y };
+    console.log("🧍 Spawning player at", playerGridPos);
     const player = PlayerEntity.create(k, playerGridPos.x, playerGridPos.y, {
         SPRITE_SIZE: 24,
         SPRITE_COLOR: [100, 150, 255]
     });
     
+    // Set initial fog of war reveal around player
+    if (window.LevelSystem && typeof LevelSystem.updateFogOfWar === "function") {
+        try {
+            LevelSystem.updateFogOfWar(k, player.gridX, player.gridY);
+        } catch (err) {
+            console.warn("Fog of war update failed at spawn:", err);
+        }
+    }
+    
     // Set camera to follow player
     CameraSystem.followTarget(player, true);
     
-    // Make player globally accessible for inventory scene
-    window.currentPlayer = player;
+    // Make player globally accessible
+    window.player = player;
+    window.currentPlayer = player; // For backward compatibility
     
-    // Create multiple rooms/areas across the world
+    // 🧪 TEST SETUP: Give player maximum mana and level for testing all spells
+    player.mana = 200;
+    player.maxMana = 200;
+    player.level = 10; // Level 10 to access ALL spells
+    console.log('🧪 TEST: Player boosted for magic testing - Mana: 200/200, Level: 10');
+    
+    // Initialize equipment stats system
+    if (window.inventory) {
+        window.inventory.applyEquipmentStats();
+        console.log('🛡️ Equipment system initialized for player');
+    }
+    
+    // Magic system is ready for testing!
+    console.log('🧪 TEST: Magic system ready - try casting spells with Z/X/C/V/B/N + 1-5');
+    console.log('🧪 TEST: Example: Z+1 for Fire Spark, B+1 for Minor Heal');
+    console.log('🧪 TEST: Player has 100 mana and level 3 for testing');
+    
+    // Note: Enemies will spawn from level data if available
+    // You can also attack the walls or test self-targeting spells
+    
+    // Initialize enemy systems here (moved from earlier in code)
+    console.log('📍 About to initialize enemy systems...');
+    console.log('🔍 Checking enemy systems availability...');
+    console.log('🔍 ENEMY_TYPES:', typeof window.ENEMY_TYPES, window.ENEMY_TYPES ? Object.keys(window.ENEMY_TYPES) : 'undefined');
+    console.log('🔍 EnemyEntity:', typeof window.EnemyEntity);
+    console.log('🔍 AISystem:', typeof window.AISystem);
+    console.log('🔍 SpawningSystem:', typeof window.SpawningSystem);
+    
+    if (window.AISystem) {
+        AISystem.init(k);
+        console.log('✅ AISystem initialized');
+    } else {
+        console.error('❌ AISystem not available');
+    }
+    
+    if (window.SpawningSystem) {
+        SpawningSystem.init(k);
+        console.log('✅ SpawningSystem initialized');
+    } else {
+        console.error('❌ SpawningSystem not available');
+    }
+    
+    // Spawn test enemies
+    if (window.ENEMY_TYPES && window.EnemyEntity) {
+        // Spawn a goblin in room 1
+        const goblin = EnemyEntity.create(k, ENEMY_TYPES.goblin, 25, 15);
+        
+        // Spawn a rat in room 2
+        const rat = EnemyEntity.create(k, ENEMY_TYPES.rat, 10, 6);
+        
+        // Spawn an orc in room 3
+        const orc = EnemyEntity.create(k, ENEMY_TYPES.orc, 38, 29);
+        
+        // Spawn a skeleton near the starting area
+        const skeleton = EnemyEntity.create(k, ENEMY_TYPES.skeleton, 20, 20);
+        
+        console.log('👹 Test enemies spawned successfully');
+    } else {
+        console.warn('⚠️ Enemy systems not loaded, skipping enemy spawn');
+    }
+    
+    // Spawn test ground items for inventory system demonstration
+    if (window.GroundItemEntity && window.ItemData && window.ItemData.DATA) {
+        console.log('📦 Spawning test ground items...');
+        
+        // Create test items using the new inventory system
+        const testItems = [
+            // Weapons
+            { itemId: 'sword', x: 24, y: 15 },
+            { itemId: 'magic_sword', x: 25, y: 15 },
+            { itemId: 'dagger', x: 26, y: 15 },
+            
+            // Armor
+            { itemId: 'leather_armor', x: 22, y: 18 },
+            { itemId: 'chain_mail', x: 23, y: 18 },
+            { itemId: 'plate_armor', x: 24, y: 18 },
+            
+            // Accessories
+            { itemId: 'ring_of_strength', x: 21, y: 17 },
+            { itemId: 'magic_cloak', x: 22, y: 17 },
+            { itemId: 'apprentice_spellbook', x: 23, y: 17 },
+            
+            // Consumables
+            { itemId: 'health_potion', x: 26, y: 16 },
+            { itemId: 'mana_potion', x: 27, y: 16 },
+            { itemId: 'strength_potion', x: 28, y: 16 },
+            
+            // Misc
+            { itemId: 'gold_coin', x: 25, y: 17 },
+            { itemId: 'scroll_fireball', x: 21, y: 16 },
+            { itemId: 'iron_key', x: 23, y: 19 },
+            { itemId: 'gem', x: 27, y: 18 },
+            { itemId: 'bread', x: 24, y: 19 }
+        ];
+        
+        testItems.forEach(testItem => {
+            const itemData = window.ItemData.DATA[testItem.itemId];
+            if (itemData) {
+
+                // Use GridUtils to get centered position within grid square
+                const centerPos = window.GridUtils.gridToPixelCenter(testItem.x, testItem.y);
+                GroundItemEntity.create(k, itemData, centerPos.x, centerPos.y);
+                console.log(`📦 Spawned ${itemData.name} at grid (${testItem.x}, ${testItem.y}) pixel (${centerPos.x}, ${centerPos.y})`);
+            } else {
+                console.warn(`⚠️ Item not found: ${testItem.itemId}`);
+            }
+        });
+        
+        console.log('✅ Test ground items spawned successfully');
+    } else {
+        console.log('🔍 Checking ground item system availability...');
+        console.log('🔍 GroundItemEntity:', typeof window.GroundItemEntity);
+        console.log('🔍 ItemData:', typeof window.ItemData);
+        console.log('🔍 ItemData.DATA:', window.ItemData ? typeof window.ItemData.DATA : 'N/A');
+        console.warn('⚠️ Ground item system not loaded, skipping item spawn');
+    }
+    
+    // Create multiple rooms/areas across the world (legacy test walls)
+    // Keep behind a flag so we can see actual dungeon walls instead
+    const SHOW_LEGACY_TEST_WALLS = false;
     
     // Room 1: Starting area (center)
     const room1Walls = [
@@ -338,18 +888,20 @@ k.scene("game", () => {
     // Combine all walls
     const allWalls = [...room1Walls, ...room2Walls, ...room3Walls];
     
-    allWalls.forEach(pos => {
-        const pixelPos = GridUtils.createGridPos(pos.x, pos.y);
-        k.add([
-            k.rect(32, 32),
-            k.color(60, 60, 60),
-            k.pos(pixelPos.x, pixelPos.y),
-            k.outline(1, k.rgb(40, 40, 40)),
-            k.z(5),
-            "wall",
-            { gridX: pos.x, gridY: pos.y }
-        ]);
-    });
+    if (SHOW_LEGACY_TEST_WALLS) {
+        allWalls.forEach(pos => {
+            const pixelPos = GridUtils.createGridPos(pos.x, pos.y);
+            k.add([
+                k.rect(32, 32),
+                k.color(60, 60, 60),
+                k.pos(pixelPos.x, pixelPos.y),
+                k.outline(1, k.rgb(40, 40, 40)),
+                k.z(5),
+                "wall",
+                { gridX: pos.x, gridY: pos.y }
+            ]);
+        });
+    }
     
     // Scatter items across the world
     const itemPositions = [
@@ -395,25 +947,28 @@ k.scene("game", () => {
     
     // Add area labels
     k.add([
-        k.text("STARTING ROOM", { size: 16, font: "monospace" }),
+        k.text("STARTING ROOM"),
         k.pos(GridUtils.createGridPos(22, 14, true).x, GridUtils.createGridPos(22, 14, true).y),
         k.anchor("center"),
+        k.scale(0.3),
         k.color(150, 150, 150),
         k.z(15)
     ]);
     
     k.add([
-        k.text("TREASURE ROOM", { size: 12, font: "monospace" }),
+        k.text("TREASURE ROOM"),
         k.pos(GridUtils.createGridPos(8, 5, true).x, GridUtils.createGridPos(8, 5, true).y),
         k.anchor("center"),
+        k.scale(0.3),
         k.color(150, 150, 150),
         k.z(15)
     ]);
     
     k.add([
-        k.text("ARMORY", { size: 12, font: "monospace" }),
+        k.text("ARMORY"),
         k.pos(GridUtils.createGridPos(38, 27, true).x, GridUtils.createGridPos(38, 27, true).y),
         k.anchor("center"),
+        k.scale(0.3),
         k.color(150, 150, 150),
         k.z(15)
     ]);
@@ -426,23 +981,19 @@ k.scene("game", () => {
     
     // Title (fixed position)
     uiLayer.add([
-        k.text("CAMERA SYSTEM DEMO", {
-            size: 24,
-            font: "monospace"
-        }),
+        k.text("CAMERA SYSTEM DEMO"),
         k.pos(k.width() / 2, 20),
         k.anchor("center"),
+        k.scale(0.4),
         k.color(220, 180, 100)
     ]);
     
     // Controls info (fixed position)
     uiLayer.add([
-        k.text("WASD: Move | I: Inventory | G: Grid | C: Free Cam | Z/X: Zoom | SPACE: Shake | ESC: Menu", {
-            size: 10,
-            font: "monospace"
-        }),
+        k.text("WASD: Move | I: Inventory | G: Grid | SPACE: Attack | ESC: Menu"),
         k.pos(k.width() / 2, k.height() - 20),
         k.anchor("center"),
+        k.scale(0.3),
         k.color(150, 150, 150)
     ]);
     
@@ -455,11 +1006,9 @@ k.scene("game", () => {
     ]);
     
     const cameraInfoText = uiLayer.add([
-        k.text("", {
-            size: 10,
-            font: "monospace"
-        }),
+        k.text(""),
         k.pos(k.width() - 205, 15),
+        k.scale(0.3),
         k.color(200, 200, 200)
     ]);
     
@@ -472,21 +1021,17 @@ k.scene("game", () => {
     ]);
     
     const playerInfoText = uiLayer.add([
-        k.text("", {
-            size: 9,
-            font: "monospace"
-        }),
+        k.text(""),
         k.pos(15, 15),
+        k.scale(0.3),
         k.color(200, 200, 200)
     ]);
     
     // Add player stats title
     uiLayer.add([
-        k.text("PLAYER STATS", {
-            size: 10,
-            font: "monospace"
-        }),
+        k.text("PLAYER STATS"),
         k.pos(15, 15),
+        k.scale(0.35),
         k.color(220, 180, 100)
     ]);
     
@@ -495,15 +1040,26 @@ k.scene("game", () => {
         const newGridX = player.gridX + dx;
         const newGridY = player.gridY + dy;
         
-        // Check if new position is valid and not blocked by walls
+        // Check if new position is valid and not blocked
         if (GridUtils.isValidGridPosition(newGridX, newGridY)) {
-            // Check for wall collision
-            const walls = k.get("wall");
-            const blocked = walls.some(wall => wall.gridX === newGridX && wall.gridY === newGridY);
+            // Unified walkability check via LevelSystem.isWalkable()
+            const canMove = (window.LevelSystem && typeof LevelSystem.isWalkable === 'function')
+                ? LevelSystem.isWalkable(newGridX, newGridY)
+                : !k.get("wall").some(wall => wall.gridX === newGridX && wall.gridY === newGridY);
             
-            if (!blocked) {
+            if (canMove) {
                 player.gridX = newGridX;
                 player.gridY = newGridY;
+
+                // Update fog of war around player
+                if (window.LevelSystem && typeof LevelSystem.updateFogOfWar === 'function') {
+                    try {
+                        LevelSystem.updateFogOfWar(k, player.gridX, player.gridY);
+                    } catch (err) {
+                        console.warn('Fog of war update failed during move:', err);
+                    }
+                }
+
                 const newPixelPos = GridUtils.createGridPos(newGridX, newGridY, true);
                 
                 // Animate movement
@@ -557,6 +1113,11 @@ k.scene("game", () => {
                         CameraSystem.shake(8, 200);
                     }
                 });
+                
+                // Process poison damage after player action
+                if (window.magicSystem) {
+                    window.magicSystem.processEntityAction(player);
+                }
             }
         }
     }
@@ -566,16 +1127,26 @@ k.scene("game", () => {
         const newGridX = player.gridX + dx;
         const newGridY = player.gridY + dy;
         
-        // Check if new position is valid and not blocked by walls
+        // Check if new position is valid and not blocked
         if (GridUtils.isValidGridPosition(newGridX, newGridY)) {
-            // Check for wall collision
-            const walls = k.get("wall");
-            const blocked = walls.some(wall => wall.gridX === newGridX && wall.gridY === newGridY);
+            // Unified walkability check via LevelSystem.isWalkable()
+            const canMove = (window.LevelSystem && typeof LevelSystem.isWalkable === 'function')
+                ? LevelSystem.isWalkable(newGridX, newGridY)
+                : !k.get("wall").some(wall => wall.gridX === newGridX && wall.gridY === newGridY);
             
-            if (!blocked) {
+            if (canMove) {
                 // Update grid position
                 player.gridX = newGridX;
                 player.gridY = newGridY;
+                
+                // Update fog of war around player
+                if (window.LevelSystem && typeof LevelSystem.updateFogOfWar === 'function') {
+                    try {
+                        LevelSystem.updateFogOfWar(k, player.gridX, player.gridY);
+                    } catch (err) {
+                        console.warn('Fog of war update failed during move:', err);
+                    }
+                }
                 
                 // Calculate pixel position
                 const newPixelPos = GridUtils.gridToPixel(newGridX, newGridY);
@@ -638,31 +1209,47 @@ k.scene("game", () => {
     
     // Grid-based movement controls with facing updates and animations
     k.onKeyPress("w", () => {
+        if (window.GameState && window.GameState.isGamePaused()) return;
         player.updateFacing('up');
         player.playAnimation('walk');
         movePlayer(0, -1);
     });
     k.onKeyPress("s", () => {
+        if (window.GameState && window.GameState.isGamePaused()) return;
         player.updateFacing('down');
         player.playAnimation('walk');
         movePlayer(0, 1);
     });
     k.onKeyPress("a", () => {
+        if (window.GameState && window.GameState.isGamePaused()) return;
         player.updateFacing('left');
         player.playAnimation('walk');
         movePlayer(-1, 0);
     });
     k.onKeyPress("d", () => {
+        if (window.GameState && window.GameState.isGamePaused()) return;
         player.updateFacing('right');
         player.playAnimation('walk');
         movePlayer(1, 0);
     });
     
-    // Attack animation for testing
+    // Combat attack
     k.onKeyPress("space", () => {
-        player.playAnimation('attack');
-        CameraSystem.shake(15, 300);
-        console.log("⚔️ Player attacks!");
+        if (window.GameState && window.GameState.isGamePaused()) {
+            console.log("⏸️ Attack blocked: game is paused");
+            return;
+        }
+        console.log("⎵ SPACE pressed: invoking CombatSystem.playerAttack()");
+        if (window.CombatSystem && typeof window.CombatSystem.playerAttack === 'function') {
+            window.CombatSystem.playerAttack();
+        } else {
+            // Fallback to simple attack animation
+            player.playAnimation('attack');
+            if (window.CameraSystem) {
+                CameraSystem.shake(15, 300);
+            }
+            console.log("⚔️ Player attacks!");
+        }
     });
     
     // Camera and display state
@@ -738,28 +1325,9 @@ k.scene("game", () => {
         }
     });
     
-    // Toggle free camera mode
-    k.onKeyPress("c", () => {
-        freeCameraMode = !freeCameraMode;
-        if (freeCameraMode) {
-            CameraSystem.stopFollowing();
-            console.log("📷 Free camera mode enabled - use arrow keys to move camera");
-        } else {
-            CameraSystem.followTarget(player);
-            console.log("📷 Following player again");
-        }
-    });
+
     
-    // Camera zoom controls
-    k.onKeyPress("z", () => {
-        CameraSystem.zoomOut();
-        console.log(`📷 Zoom: ${CameraSystem.getZoom().toFixed(2)}x`);
-    });
-    
-    k.onKeyPress("x", () => {
-        CameraSystem.zoomIn();
-        console.log(`📷 Zoom: ${CameraSystem.getZoom().toFixed(2)}x`);
-    });
+
     
     // Test hurt animation
     k.onKeyPress("h", () => {
@@ -773,16 +1341,30 @@ k.scene("game", () => {
         console.log("⭐ Player level up animation!");
     });
     
-    // Open inventory
+    // Help key
+    k.onKeyPress("h", () => {
+        if (window.MessageSystem) {
+            window.MessageSystem.addMessage('Help: WASD to move, SPACE to attack, I for inventory', 'info');
+        }
+    });
+    
+    // Open inventory UI
     k.onKeyPress("i", () => {
-        console.log("🎒 Opening inventory...");
-        // Save current game state before switching to inventory
-        GameState.saveState(k);
-        k.go("inventory");
+        if (window.inventoryUI) {
+            inventoryUI.toggle();
+        } else {
+            console.error("❌ InventoryUI not available");
+        }
+    });
+    
+    // Spawn test enemies for spell testing
+    k.onKeyPress("t", () => {
+        spawnTestEnemies(k);
     });
     
     // Arrow key movement (when not in free camera mode) and free camera movement
     k.onKeyPress("up", () => {
+        if (window.GameState && window.GameState.isGamePaused()) return;
         if (!freeCameraMode) {
             player.updateFacing('up');
             player.playAnimation('walk');
@@ -791,6 +1373,7 @@ k.scene("game", () => {
     });
     
     k.onKeyPress("down", () => {
+        if (window.GameState && window.GameState.isGamePaused()) return;
         if (!freeCameraMode) {
             player.updateFacing('down');
             player.playAnimation('walk');
@@ -799,6 +1382,7 @@ k.scene("game", () => {
     });
     
     k.onKeyPress("left", () => {
+        if (window.GameState && window.GameState.isGamePaused()) return;
         if (!freeCameraMode) {
             player.updateFacing('left');
             player.playAnimation('walk');
@@ -807,6 +1391,7 @@ k.scene("game", () => {
     });
     
     k.onKeyPress("right", () => {
+        if (window.GameState && window.GameState.isGamePaused()) return;
         if (!freeCameraMode) {
             player.updateFacing('right');
             player.playAnimation('walk');
@@ -850,6 +1435,7 @@ k.scene("game", () => {
     
     // Mouse-based movement
     k.onMouseDown((button) => {
+        if (window.GameState && window.GameState.isGamePaused()) return; // Don't move when paused
         if (freeCameraMode) return; // Don't move player in free camera mode
         if (button !== "left") return; // Only respond to left clicks
         
@@ -960,11 +1546,75 @@ k.scene("game", () => {
     
     // Main update loop
     k.onUpdate(() => {
-        // Update camera system
-        CameraSystem.update(k);
+        try {
+            // Get delta time safely
+            const deltaTime = k.dt();
+            if (typeof deltaTime !== 'number' || isNaN(deltaTime)) {
+                console.warn('Invalid delta time, skipping update');
+                return;
+            }
+            
+            // Update camera system
+            CameraSystem.update(k);
+            
+            // Update player animations
+            PlayerEntity.updateAnimation(k, player, deltaTime);
+            
+            // Update AI system for all enemies
+            if (window.AISystem) {
+                AISystem.update(k, deltaTime);
+            }
+            
+            // Update spawning system
+            if (window.SpawningSystem) {
+                SpawningSystem.update(k, deltaTime);
+            }
+            
+            // Update combat system
+            if (window.CombatSystem) {
+                CombatSystem.update(k, deltaTime);
+            }
+        } catch (error) {
+            console.error('Error in main update loop:', error);
+        }
         
-        // Update player animations
-        PlayerEntity.updateAnimation(k, player, k.dt());
+        // Update pickup system
+        if (window.pickupSystem) {
+            window.pickupSystem.update();
+        }
+        
+        // Update UI systems
+        if (window.HealthBarUI) {
+            HealthBarUI.update();
+        }
+        
+        if (window.MessageUI) {
+            MessageUI.update();
+        }
+        
+        // Update tooltip UI
+        if (window.TooltipUI) {
+            window.TooltipUI.update();
+        }
+        
+        // Update magic system
+        if (window.magicSystem) {
+            window.magicSystem.update();
+        }
+        
+        // Update spell UI
+        if (window.spellUI) {
+            window.spellUI.update();
+        }
+        
+        // Update combat UI based on combat state
+        if (window.CombatUI && window.CombatSystem) {
+            CombatUI.updateCombatState(
+                CombatSystem.combatActive,
+                CombatSystem.currentTurn,
+                CombatSystem.combatQueue
+            );
+        }
         
         // Update UI displays
         const cameraPos = CameraSystem.getPosition();
@@ -1007,14 +1657,156 @@ k.scene("game", () => {
     }
 });
 
+// Create inventory overlay function
+function createInventoryOverlay(k, player, closeCallback) {
+    // Create overlay background
+    const overlay = k.add([
+        k.rect(k.width(), k.height()),
+        k.color(0, 0, 0, 0.8), // Semi-transparent black
+        k.pos(0, 0),
+        k.fixed(), // Stay on screen regardless of camera
+        k.z(1000) // High z-index to appear on top
+    ]);
+    
+    // Inventory panel
+    const panel = overlay.add([
+        k.rect(600, 400),
+        k.color(30, 30, 40),
+        k.pos(k.width() / 2 - 300, k.height() / 2 - 200),
+        k.outline(2, k.rgb(100, 100, 100))
+    ]);
+    
+    // Title
+    overlay.add([
+        k.text("INVENTORY"),
+        k.pos(k.width() / 2, k.height() / 2 - 170),
+        k.anchor("center"),
+        k.color(220, 180, 100)
+    ]);
+    
+    // Player stats
+    const stats = player.stats || {};
+    const statsText = [
+        `Level: ${stats.level || 1}`,
+        `Health: ${stats.hp || 100}/${stats.maxHp || 100}`,
+        `Mana: ${stats.mp || 50}/${stats.maxMp || 50}`,
+        `Attack: ${stats.attack || 10}`,
+        `Defense: ${stats.defense || 5}`,
+        `Gold: ${stats.gold || 100}`,
+        `EXP: ${stats.exp || 0}/${stats.expToNext || 100}`
+    ];
+    
+    // Stats panel
+    overlay.add([
+        k.rect(250, 180),
+        k.color(25, 25, 35),
+        k.pos(k.width() / 2 - 280, k.height() / 2 - 130),
+        k.outline(1, k.rgb(80, 80, 80))
+    ]);
+    
+    overlay.add([
+        k.text("PLAYER STATS"),
+        k.pos(k.width() / 2 - 155, k.height() / 2 - 110),
+        k.anchor("center"),
+        k.color(180, 180, 180)
+    ]);
+    
+    statsText.forEach((line, index) => {
+        overlay.add([
+            k.text(line),
+            k.pos(k.width() / 2 - 270, k.height() / 2 - 85 + index * 18),
+            k.color(200, 200, 200)
+        ]);
+    });
+    
+    // Inventory items panel
+    overlay.add([
+        k.rect(320, 180),
+        k.color(25, 25, 35),
+        k.pos(k.width() / 2 - 10, k.height() / 2 - 130),
+        k.outline(1, k.rgb(80, 80, 80))
+    ]);
+    
+    overlay.add([
+        k.text("INVENTORY"),
+        k.pos(k.width() / 2 + 150, k.height() / 2 - 110),
+        k.anchor("center"),
+        k.color(180, 180, 180)
+    ]);
+    
+    // Display inventory items
+    const inventory = player.inventory || [];
+    if (inventory.length === 0) {
+        overlay.add([
+            k.text("No items in inventory"),
+            k.pos(k.width() / 2 + 150, k.height() / 2 - 40),
+            k.anchor("center"),
+            k.color(150, 150, 150)
+        ]);
+    } else {
+        // Display actual inventory items
+        inventory.slice(0, 12).forEach((item, index) => { // Show max 12 items
+            const x = k.width() / 2 + 20 + (index % 4) * 70;
+            const y = k.height() / 2 - 80 + Math.floor(index / 4) * 50;
+            
+            // Item colors based on type
+            const itemColors = {
+                'gold': [255, 215, 0],
+                'potion': [255, 100, 100],
+                'sword': [192, 192, 192],
+                'emerald': [100, 255, 100],
+                'scroll': [255, 150, 0],
+                'crystal': [150, 100, 255],
+                'armor': [255, 200, 200],
+                'key': [255, 255, 100],
+                'gem': [100, 200, 255],
+                'book': [200, 100, 50]
+            };
+            
+            const itemColor = itemColors[item.type] || [200, 200, 200];
+            
+            overlay.add([
+                k.rect(30, 30),
+                k.color(...itemColor),
+                k.pos(x, y),
+                k.outline(1, k.rgb(80, 80, 80))
+            ]);
+            
+            overlay.add([
+                k.text(item.name || item.type),
+                k.pos(x + 15, y + 35),
+                k.anchor("center"),
+                k.color(200, 200, 200)
+            ]);
+        });
+    }
+    
+    // Controls
+    overlay.add([
+        k.text("Press I or ESC to close"),
+        k.pos(k.width() / 2, k.height() / 2 + 150),
+        k.anchor("center"),
+        k.color(150, 150, 150)
+    ]);
+    
+    // Handle ESC key to close inventory
+    const escapeHandler = k.onKeyPress("escape", () => {
+        closeCallback();
+        escapeHandler.cancel(); // Remove this event handler
+        console.log(" Inventory closed with ESC");
+    });
+    
+    return overlay;
+}
+
 // Create inventory scene
 createInventoryScene(k);
 
 // Debug canvas information
 const gameCanvas = document.getElementById('game-canvas');
-console.log("🖼️ Canvas element:", gameCanvas);
-console.log("🖼️ Canvas dimensions:", gameCanvas.width, "x", gameCanvas.height);
-console.log("🖼️ Canvas style:", gameCanvas.style.cssText);
+console.log(" Canvas element:", gameCanvas);
+console.log(" Canvas dimensions:", gameCanvas.width, "x", gameCanvas.height);
+console.log(" Canvas style:", gameCanvas.style.cssText);
 const ctx = gameCanvas.getContext('2d');
 console.log("🎨 Canvas context:", ctx);
 

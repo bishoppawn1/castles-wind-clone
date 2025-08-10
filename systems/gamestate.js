@@ -5,6 +5,7 @@ const GameState = {
     // Current game state
     currentState: null,
     isInitialized: false,
+    isPaused: false,
     
     // Player state
     playerState: {
@@ -87,37 +88,52 @@ const GameState = {
             this.cameraState.following = typeof CameraSystem.isFollowing === 'function' ? CameraSystem.isFollowing() : true;
         }
         
-        // Save world state (items collected, etc.)
+        // Save current items state (which items still exist)
         const items = k.get("item");
-        const allItemPositions = [];
+        const currentItems = [];
         items.forEach(item => {
-            allItemPositions.push({
+            currentItems.push({
                 gridX: item.gridX,
                 gridY: item.gridY,
-                type: item.itemType || 'unknown'
+                type: item.itemType || 'unknown',
+                name: item.name || 'Unknown Item'
             });
         });
         
-        // Find items that were collected (not in current items list)
-        const currentItemKeys = allItemPositions.map(item => `${item.gridX},${item.gridY}`);
+        // Save current enemies state (which enemies still exist)
+        const enemies = k.get("enemy");
+        const currentEnemies = [];
+        enemies.forEach(enemy => {
+            if (!enemy.isDead) {
+                currentEnemies.push({
+                    gridX: enemy.gridX,
+                    gridY: enemy.gridY,
+                    enemyId: enemy.enemyId,
+                    name: enemy.name,
+                    hp: enemy.hp || enemy.maxHp,
+                    maxHp: enemy.maxHp
+                });
+            }
+        });
         
         // Mark that we have saved state
         this.currentState = {
             saved: true,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            items: currentItems,
+            enemies: currentEnemies
         };
         
-        console.log("💾 Game state saved");
+        console.log(`💾 Game state saved: ${currentItems.length} items, ${currentEnemies.length} enemies`);
     },
     
     // Restore game state
     restoreState(k) {
-        if (!this.isInitialized) return false;
+        if (!this.isInitialized || !this.currentState) return false;
         
         console.log("📂 Restoring game state...");
         
-        // Don't recreate the world - it should already exist
-        // Just restore player position and state
+        // Restore player position and state
         const player = k.get("player")[0];
         if (player) {
             // Restore player position
@@ -232,6 +248,25 @@ const GameState = {
     // Get player inventory
     getPlayerInventory() {
         return [...this.playerState.inventory];
+    },
+    
+    // Pause the game
+    pauseGame() {
+        if (this.isPaused) return;
+        this.isPaused = true;
+        console.log("⏸️ Game paused");
+    },
+    
+    // Resume the game
+    resumeGame() {
+        if (!this.isPaused) return;
+        this.isPaused = false;
+        console.log("▶️ Game resumed");
+    },
+    
+    // Check if game is paused
+    isGamePaused() {
+        return this.isPaused;
     }
 };
 

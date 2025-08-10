@@ -94,14 +94,22 @@ export const TileSystem = {
         const pixelX = gridX * tileSize + tileSize / 2;
         const pixelY = gridY * tileSize + tileSize / 2;
         
-        const tile = k.add([
+        // Add a generic 'wall' tag for all wall variants to maintain compatibility
+        const genericTags = [];
+        if (typeof tileType === "string" && tileType.startsWith("wall")) {
+            genericTags.push("wall");
+        }
+        // Build component list so we can conditionally attach components
+        const components = [
             k.rect(tileSize, tileSize),
             k.color(...config.color),
+            k.opacity(1),
             k.pos(pixelX, pixelY),
             k.anchor("center"),
             k.z(0), // Tiles are at the bottom layer
             "tile",
             tileType,
+            ...genericTags,
             {
                 gridX: gridX,
                 gridY: gridY,
@@ -109,17 +117,18 @@ export const TileSystem = {
                 solid: config.solid,
                 walkable: config.walkable,
                 description: config.description,
-                interactive: config.interactive || false
+                interactive: config.interactive || false,
+                // Preserve the original color so lighting can be applied reliably
+                baseColor: Array.isArray(config.color) ? [...config.color] : [255, 255, 255]
             }
-        ]);
+        ];
         
-        // Add outline for better visibility
+        // Add outline for better visibility on solid tiles
         if (config.solid) {
-            tile.add([
-                k.outline(2, k.rgb(20, 20, 20))
-            ]);
+            components.push(k.outline(2, k.rgb(20, 20, 20)));
         }
         
+        const tile = k.add(components);
         return tile;
     },
     
@@ -182,12 +191,12 @@ export const TileSystem = {
     },
     
     // Add lighting effect to tile
-    addLighting(tile, intensity = 1.0) {
-        const originalColor = tile.color;
+    addLighting(k, tile, intensity = 1.0) {
+        const base = Array.isArray(tile.baseColor) ? tile.baseColor : [255, 255, 255];
         const lightedColor = [
-            Math.min(255, originalColor[0] * intensity),
-            Math.min(255, originalColor[1] * intensity),
-            Math.min(255, originalColor[2] * intensity)
+            Math.min(255, Math.floor(base[0] * intensity)),
+            Math.min(255, Math.floor(base[1] * intensity)),
+            Math.min(255, Math.floor(base[2] * intensity))
         ];
         tile.color = k.rgb(...lightedColor);
     },
