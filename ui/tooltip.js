@@ -109,7 +109,7 @@ class TooltipUI {
                 fadeIn: 0,
                 update() {
                     // Fade in animation
-                    if (this.fadeIn < 1) {
+                    if (this.fadeIn < 1 && this.k && typeof this.k.dt === 'function') {
                         this.fadeIn += this.k.dt() * 4;
                         this.opacity = Math.min(1, this.fadeIn);
                     }

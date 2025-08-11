@@ -31,6 +31,9 @@ export const LevelSystem = {
         // Create tiles
         this.createLevelTiles(k, levelData);
         
+        // Spawn doors
+        this.spawnLevelDoors(k, levelData);
+        
         // Spawn items
         this.spawnLevelItems(k, levelData);
         
@@ -64,6 +67,9 @@ export const LevelSystem = {
         
         // Create tiles
         this.createLevelTiles(k, levelData);
+        
+        // Spawn doors
+        this.spawnLevelDoors(k, levelData);
         
         // Spawn items
         this.spawnLevelItems(k, levelData);
@@ -149,7 +155,7 @@ export const LevelSystem = {
     
     // Check if symbol represents an entity (not a tile)
     isEntitySymbol(symbol) {
-        const entitySymbols = ['@', 'T', 'C', 'P', 'G', 'A', 'M', 'g', 'o', 'r', 's'];
+        const entitySymbols = ['@', 'T', 'C', 'P', 'G', 'A', 'M', 'g', 'o', 'r', 's', 'D'];
         return entitySymbols.includes(symbol);
     },
     
@@ -354,31 +360,55 @@ export const LevelSystem = {
     
     // Create an enemy (placeholder)
     createEnemy(k, enemyType, gridX, gridY, tileSize, data = {}) {
+        // Prefer the full EnemyEntity-based creation so enemies have correct metadata (enemyId, ai, stats)
+        try {
+            // Resolve enemy type object
+            let typeObj = (enemyType && typeof enemyType === "object" && enemyType.id)
+                ? enemyType
+                : undefined;
+
+            if (!typeObj && typeof enemyType === "string") {
+                if (typeof window !== "undefined" && window.ENEMY_TYPES && window.ENEMY_TYPES[enemyType]) {
+                    typeObj = window.ENEMY_TYPES[enemyType];
+                }
+                // If symbol or unknown key, try lookup by symbol via EnemyUtils
+                if (!typeObj && typeof window !== "undefined" && window.EnemyUtils && typeof window.EnemyUtils.getEnemyBySymbol === "function") {
+                    const bySymbol = window.EnemyUtils.getEnemyBySymbol(enemyType);
+                    if (bySymbol) typeObj = bySymbol;
+                }
+            }
+
+            if (typeof window !== "undefined" && window.EnemyEntity && typeObj) {
+                // Use the canonical creation path
+                return window.EnemyEntity.create(k, typeObj, gridX, gridY, data);
+            }
+        } catch (e) {
+            console.warn("LevelSystem.createEnemy: EnemyEntity path failed, falling back to placeholder creation", e);
+        }
+
+        // Fallback: create a very simple enemy, but ensure it still has an enemyId and 'enemy' tag
         const pixelX = gridX * tileSize + tileSize / 2;
         const pixelY = gridY * tileSize + tileSize / 2;
-        
-        const enemyColors = {
-            goblin: [0, 255, 0],      // Green
-            orc: [255, 0, 0],         // Red
-            rat: [139, 69, 19],       // Brown
-            skeleton: [255, 255, 255] // White
-        };
-        
-        const color = enemyColors[enemyType] || [255, 0, 0];
-        
+
+        const fallbackId = (enemyType && typeof enemyType === "object" && enemyType.id)
+            ? enemyType.id
+            : (typeof enemyType === "string" ? enemyType : "enemy");
+
         const enemy = k.add([
             k.rect(tileSize * 0.8, tileSize * 0.8),
-            k.color(...color),
+            k.color(255, 0, 0),
             k.pos(pixelX, pixelY),
             k.anchor("center"),
-            k.z(8), // Enemies above items
+            k.z(8),
             k.outline(2, k.rgb(0, 0, 0)),
             "enemy",
-            enemyType,
+            fallbackId,
             {
                 gridX: gridX,
                 gridY: gridY,
-                enemyType: enemyType,
+                enemyId: fallbackId,
+                name: fallbackId.charAt(0).toUpperCase() + fallbackId.slice(1),
+                enemyType: (typeof enemyType === "object" && enemyType) || { id: fallbackId, name: fallbackId },
                 level: data.level || 1,
                 health: data.health || 10,
                 maxHealth: data.maxHealth || 10,
@@ -386,8 +416,92 @@ export const LevelSystem = {
                 defense: data.defense || 0
             }
         ]);
-        
+
         return enemy;
+    },
+    
+    // Spawn doors from level data
+    spawnLevelDoors(k, levelData) {
+        console.log('🚪 Starting door spawning process...');
+        const layout = levelData?.layout;
+        if (!Array.isArray(layout)) {
+            console.log('❌ No layout found for door spawning');
+            return;
+        }
+        
+        const tileSize = (typeof levelData?.tileSize === "number" && levelData.tileSize > 0) ? levelData.tileSize : 32;
+        console.log(`🚪 Scanning layout for doors (${layout.length} rows, tileSize: ${tileSize})`);
+        
+        let doorsFound = 0;
+        for (let y = 0; y < layout.length; y++) {
+            const row = layout[y];
+            if (!(typeof row === "string" || Array.isArray(row))) continue;
+            
+            for (let x = 0; x < row.length; x++) {
+                const symbol = row[x];
+                if (symbol === 'D') {
+                    doorsFound++;
+                    console.log(`🚪 Found door symbol at position (${x}, ${y})`);
+                    
+                    // Create floor tile underneath the door
+                    const floorTile = TileSystem.createTile(k, 'floor', x, y, tileSize);
+                    if (floorTile) {
+                        this.levelTiles.push(floorTile);
+                        console.log(`🚪 Created floor tile under door at (${x}, ${y})`);
+                    }
+                    
+                    // Create door entity
+                    const door = this.createDoor(k, x, y, tileSize);
+                    if (door) {
+                        this.levelItems.push(door); // Track doors with items for cleanup
+                        console.log(`🚪 Successfully created door entity at (${x}, ${y})`);
+                    } else {
+                        console.error(`❌ Failed to create door entity at (${x}, ${y})`);
+                    }
+                }
+            }
+        }
+        
+        console.log(`🚪 Door spawning complete: Found ${doorsFound} door symbols, spawned ${this.getAllDoors(k).length} door entities`);
+    },
+    
+    // Create a door entity
+    createDoor(k, gridX, gridY, tileSize, doorData = {}) {
+        // Use DoorEntity system if available
+        if (typeof window !== 'undefined' && window.DoorEntity) {
+            return window.DoorEntity.create(k, gridX, gridY, tileSize, doorData);
+        }
+        
+        // Fallback: create basic door
+        const pixelX = gridX * tileSize + tileSize / 2;
+        const pixelY = gridY * tileSize + tileSize / 2;
+        
+        const door = k.add([
+            k.rect(tileSize, tileSize),
+            k.color(100, 60, 30),
+            k.pos(pixelX, pixelY),
+            k.anchor("center"),
+            k.area(),
+            k.z(1),
+            k.outline(2, k.rgb(40, 20, 10)),
+            "door",
+            "interactive",
+            {
+                gridX: gridX,
+                gridY: gridY,
+                isOpen: false,
+                solid: true,
+                walkable: false,
+                description: 'Wooden door'
+            }
+        ]);
+        
+        return door;
+    },
+    
+    // Get all doors in the level
+    getAllDoors(k) {
+        return k.get("door");
     },
     
     // Apply lighting effects
@@ -456,6 +570,56 @@ export const LevelSystem = {
         }
     },
     
+    // Dynamic player-centered lighting (brighter near player)
+    // Recomputes a local area around the player using baseline (ambient + torches)
+    // and adds a smooth player boost, avoiding light trails.
+    applyPlayerLight(k, playerGridX, playerGridY) {
+        const fog = this.currentLevelData?.fogOfWar || {};
+        const visRadius = fog.visionRadius ?? 3;
+        const radius = Math.max(1, visRadius); // lighting radius
+        const maxBoost = 0.6; // up to +60% brighter at the center
+        const ambient = this.currentLevelData?.lighting?.ambient ?? 1;
+
+        // Gather torch sources (placed in applyTorchLight)
+        const torches = k.get("torch") || [];
+
+        // Recompute lighting for a small area around the player
+        for (let dy = -(radius + 1); dy <= (radius + 1); dy++) {
+            for (let dx = -(radius + 1); dx <= (radius + 1); dx++) {
+                const tileX = playerGridX + dx;
+                const tileY = playerGridY + dy;
+                const tile = TileSystem.getTileAt(k, tileX, tileY);
+                if (!tile) continue;
+
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                // Baseline intensity from ambient and any torches affecting this tile
+                let baseline = ambient;
+                for (const t of torches) {
+                    const tdx = tileX - (t.gridX ?? 0);
+                    const tdy = tileY - (t.gridY ?? 0);
+                    const td = Math.sqrt(tdx * tdx + tdy * tdy);
+                    const tr = t.lightRadius ?? 0;
+                    if (tr > 0 && td <= tr) {
+                        const torchBoost = (t.lightIntensity ?? 0) * (1 - td / tr);
+                        baseline = Math.max(baseline, 1 + torchBoost);
+                    }
+                }
+
+                // Player boost (only within radius)
+                let playerFactor = 1;
+                if (dist <= radius) {
+                    const frac = 1 - (dist / (radius + 0.0001));
+                    const boost = maxBoost * Math.max(0, Math.min(1, frac));
+                    playerFactor = 1 + boost;
+                }
+
+                const finalIntensity = Math.max(baseline, playerFactor);
+                TileSystem.addLighting(k, tile, finalIntensity);
+            }
+        }
+    },
+    
     // Initialize fog of war
     initializeFogOfWar(k, levelData) {
         if (!levelData.fogOfWar?.enabled) return;
@@ -486,8 +650,12 @@ export const LevelSystem = {
                     const tile = TileSystem.getTileAt(k, tileX, tileY);
                     
                     if (tile) {
-                        const visibility = exploredOpacity * (1 - distance / (visionRadius + 1));
-                        TileSystem.revealTile(tile, Math.max(0.3, visibility));
+                        // Make tiles closest to the player fully visible (1.0),
+                        // fading smoothly down to exploredOpacity at the edge of vision.
+                        const frac = 1 - (distance / (visionRadius + 0.0001));
+                        const clamped = Math.max(0, Math.min(1, frac));
+                        const visibility = exploredOpacity + (1 - exploredOpacity) * clamped;
+                        TileSystem.revealTile(tile, visibility);
                     }
                 }
             }
@@ -498,6 +666,13 @@ export const LevelSystem = {
             this.updateEntityVisibility(k, playerGridX, playerGridY);
         } catch (e) {
             console.warn("updateEntityVisibility failed:", e);
+        }
+        
+        // Brighten tiles around the player after fog reveal
+        try {
+            this.applyPlayerLight(k, playerGridX, playerGridY);
+        } catch (e) {
+            console.warn("applyPlayerLight failed:", e);
         }
     },
     
@@ -572,7 +747,29 @@ export const LevelSystem = {
     // Check if position is walkable in current level
     isWalkable(gridX, gridY) {
         if (!this.currentLevelData) return false;
-        return LevelUtils.isWalkable(this.currentLevelData, gridX, gridY);
+        
+        // First check if the tile itself is walkable
+        const tileWalkable = LevelUtils.isWalkable(this.currentLevelData, gridX, gridY);
+        if (!tileWalkable) return false;
+        
+        // Then check for closed doors at this position
+        console.log(`🔧 LevelSystem.isWalkable: this.k = ${typeof this.k}, window.k = ${typeof window.k}`);
+        const k = this.k || window.k;
+        if (k && typeof k.get === 'function') {
+            const doors = k.get('door');
+            console.log(`🔧 Checking walkability at (${gridX}, ${gridY}) - found ${doors.length} doors`);
+            for (let door of doors) {
+                console.log(`🔧 Door at (${door.gridX}, ${door.gridY}) - solid: ${door.solid}, isOpen: ${door.isOpen}`);
+                if (door.gridX === gridX && door.gridY === gridY && door.solid) {
+                    console.log(`🚪 Movement blocked by closed door at (${gridX}, ${gridY})`);
+                    return false;
+                }
+            }
+        } else {
+            console.log(`🔧 No Kaboom context available for door collision check`);
+        }
+        
+        return true;
     },
     
     // Get level dimensions

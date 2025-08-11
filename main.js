@@ -331,6 +331,15 @@ function spawnTestEnemies(k) {
                         }
                     }
                     
+                    // Check for closed doors
+                    const doors = k.get('door');
+                    for (let door of doors) {
+                        if (door.gridX === gridX && door.gridY === gridY && door.solid) {
+                            console.log(`🚪 Enemy movement blocked by closed door at (${gridX}, ${gridY})`);
+                            return false;
+                        }
+                    }
+                    
                     // Check for other enemies at that position
                     const enemies = k.get('enemy');
                     for (let enemy of enemies) {
@@ -617,6 +626,18 @@ k.scene("game", () => {
         console.error('❌ Spell UI not available');
     }
     
+    // Initialize interaction system
+    if (window.InteractionSystem) {
+        try {
+            InteractionSystem.init(k);
+            console.log('✅ Interaction system initialized successfully');
+        } catch (error) {
+            console.error('❌ Interaction system initialization failed:', error);
+        }
+    } else {
+        console.error('❌ Interaction system not available');
+    }
+    
     // Initialize game state manager
     if (!GameState.isInitialized) {
         GameState.init();
@@ -681,24 +702,15 @@ k.scene("game", () => {
         GRID_HEIGHT: 38
     });
     
-    // Procedural dungeon: generate and load
-    try {
-        const DG = (typeof window !== "undefined" && window.DungeonGenerator) ? window.DungeonGenerator : DungeonGenerator;
-        const levelData = DG.generate(50, 38, { tileSize: 32 });
-        console.log("🧭 Generated procedural dungeon level", { width: 50, height: 38, tileSize: 32 });
-        if (window.LevelSystem && typeof LevelSystem.loadLevelData === "function") {
-            LevelSystem.loadLevelData(k, levelData);
-        } else {
-            console.error("❌ LevelSystem not available; cannot load generated level");
-        }
-        // Store for inspection
-        window.currentLevelData = levelData;
-    } catch (err) {
-        console.error("❌ Dungeon generation failed; falling back to LEVEL_1", err);
-        if (window.LevelSystem && typeof LevelSystem.loadLevel === "function") {
-            LevelSystem.loadLevel(k, 1);
-            window.currentLevelData = LevelSystem.currentLevelData;
-        }
+    // Temporarily disable procedural dungeon to test door system
+    // Load LEVEL_1 with our door modifications
+    console.log("🚪 Loading LEVEL_1 to test door system...");
+    if (window.LevelSystem && typeof LevelSystem.loadLevel === "function") {
+        LevelSystem.loadLevel(k, 1);
+        window.currentLevelData = LevelSystem.currentLevelData;
+        console.log("🚪 LEVEL_1 loaded for door testing");
+    } else {
+        console.error("❌ LevelSystem not available; cannot load LEVEL_1");
     }
     
     // Draw debug grid (optional)
@@ -990,7 +1002,7 @@ k.scene("game", () => {
     
     // Controls info (fixed position)
     uiLayer.add([
-        k.text("WASD: Move | I: Inventory | G: Grid | SPACE: Attack | ESC: Menu"),
+        k.text("WASD: Move | I: Inventory | G: Grid | SPACE: Attack | E: Interact | ESC: Menu"),
         k.pos(k.width() / 2, k.height() - 20),
         k.anchor("center"),
         k.scale(0.3),
@@ -1035,176 +1047,115 @@ k.scene("game", () => {
         k.color(220, 180, 100)
     ]);
     
+    // Debug walkability helpers (toggle with window.DEBUG_WALKABILITY = true in console)
+    function debugWalkabilityEnabled() {
+        try { return typeof window !== 'undefined' && window.DEBUG_WALKABILITY === true; } catch { return false; }
+    }
+    function logWalkabilityAt(x, y, reason = "blocked") {
+        if (!debugWalkabilityEnabled()) return;
+        try {
+            const ls = (typeof window !== 'undefined') ? window.LevelSystem : null;
+            const lu = (typeof window !== 'undefined') ? window.LevelUtils : null;
+            const level = ls?.currentLevelData;
+            const symbol = (level?.layout?.[y] && typeof level.layout[y] === 'string') ? level.layout[y][x] : undefined;
+            const type = lu && level ? lu.getTileAt(level, x, y) : undefined;
+            const walk = lu && level ? lu.isWalkable(level, x, y) : undefined;
+            console.log(`🚧 Move ${reason} to (${x},${y}) symbol='${symbol}' type='${type}' walkable=${walk}`);
+        } catch (e) {
+            console.log("🚧 Move blocked (debug logging failed)", e);
+        }
+    }
+
     // Player movement using grid system
     function movePlayer(dx, dy) {
         const newGridX = player.gridX + dx;
         const newGridY = player.gridY + dy;
         
-        // Check if new position is valid and not blocked
-        if (GridUtils.isValidGridPosition(newGridX, newGridY)) {
-            // Unified walkability check via LevelSystem.isWalkable()
-            const canMove = (window.LevelSystem && typeof LevelSystem.isWalkable === 'function')
-                ? LevelSystem.isWalkable(newGridX, newGridY)
-                : !k.get("wall").some(wall => wall.gridX === newGridX && wall.gridY === newGridY);
-            
-            if (canMove) {
-                player.gridX = newGridX;
-                player.gridY = newGridY;
-
-                // Update fog of war around player
-                if (window.LevelSystem && typeof LevelSystem.updateFogOfWar === 'function') {
-                    try {
-                        LevelSystem.updateFogOfWar(k, player.gridX, player.gridY);
-                    } catch (err) {
-                        console.warn('Fog of war update failed during move:', err);
-                    }
-                }
-
-                const newPixelPos = GridUtils.createGridPos(newGridX, newGridY, true);
-                
-                // Animate movement
-                player.playAnimation('walk');
-                player.isMoving = true;
-                
-                // Smooth movement tween
-                k.tween(player.pos, k.vec2(newPixelPos.x, newPixelPos.y), 0.15, (pos) => {
-                    if (player.exists()) {
-                        player.pos = pos;
-                    }
-                }, k.easings.easeOutQuad).then(() => {
-                    if (player.exists()) {
-                        player.isMoving = false;
-                        player.playAnimation('idle');
-                    }
-                });
-                
-                // Check for item pickup
-                const items = k.get("item");
-                items.forEach(item => {
-                    if (item.gridX === newGridX && item.gridY === newGridY) {
-                        // Create item object for inventory
-                        const itemData = {
-                            id: `${item.itemType}_${Date.now()}`,
-                            name: item.itemType,
-                            type: item.itemType,
-                            value: getItemValue(item.itemType),
-                            description: getItemDescription(item.itemType)
-                        };
-                        
-                        // Add to player inventory through GameState
-                        GameState.playerState.inventory.push(itemData);
-                        GameState.playerState.stats.inventoryCount++;
-                        
-                        // Track collected item in world state
-                        const itemId = `${item.itemType}_${item.gridX}_${item.gridY}`;
-                        GameState.worldState.itemsCollected.push(itemId);
-                        
-                        console.log(`Picked up ${item.itemType}! (ID: ${itemId})`);
-                        itemsCollected++;
-                        
-                        // Grant experience for finding items
-                        if (player.gainExperience) {
-                            player.gainExperience(80); // Temporarily high for testing level up
-                        }
-                        
-                        k.destroy(item);
-                        
-                        // Shake camera on item pickup
-                        CameraSystem.shake(8, 200);
-                    }
-                });
-                
-                // Process poison damage after player action
-                if (window.magicSystem) {
-                    window.magicSystem.processEntityAction(player);
-                }
-            }
+        // Bounds check
+        if (!GridUtils.isValidGridPosition(newGridX, newGridY)) {
+            logWalkabilityAt(newGridX, newGridY, "blocked (out of bounds)");
+            return;
         }
-    }
-    
-    // Smooth movement function for mouse-based movement
-    function movePlayerSmooth(dx, dy) {
-        const newGridX = player.gridX + dx;
-        const newGridY = player.gridY + dy;
         
-        // Check if new position is valid and not blocked
-        if (GridUtils.isValidGridPosition(newGridX, newGridY)) {
-            // Unified walkability check via LevelSystem.isWalkable()
-            const canMove = (window.LevelSystem && typeof LevelSystem.isWalkable === 'function')
-                ? LevelSystem.isWalkable(newGridX, newGridY)
-                : !k.get("wall").some(wall => wall.gridX === newGridX && wall.gridY === newGridY);
-            
-            if (canMove) {
-                // Update grid position
-                player.gridX = newGridX;
-                player.gridY = newGridY;
-                
-                // Update fog of war around player
-                if (window.LevelSystem && typeof LevelSystem.updateFogOfWar === 'function') {
-                    try {
-                        LevelSystem.updateFogOfWar(k, player.gridX, player.gridY);
-                    } catch (err) {
-                        console.warn('Fog of war update failed during move:', err);
-                    }
-                }
-                
-                // Calculate pixel position
-                const newPixelPos = GridUtils.gridToPixel(newGridX, newGridY);
-                player.isMoving = true;
-                
-                // Store tween reference for potential cancellation
-                player.currentTween = k.tween(player.pos, k.vec2(newPixelPos.x, newPixelPos.y), 0.15, (pos) => {
-                    if (player.exists()) {
-                        player.pos = pos;
-                    }
-                }, k.easings.easeOutQuad).then(() => {
-                    if (player.exists()) {
-                        player.isMoving = false;
-                        player.currentTween = null;
-                        player.playAnimation('idle');
-                    }
-                });
-                
-                // Check for item pickup
-                const items = k.get("item");
-                items.forEach(item => {
-                    if (item.gridX === newGridX && item.gridY === newGridY) {
-                        // Create item object for inventory
-                        const itemData = {
-                            id: `${item.itemType}_${Date.now()}`,
-                            name: item.itemType,
-                            type: item.itemType,
-                            value: getItemValue(item.itemType),
-                            description: getItemDescription(item.itemType)
-                        };
-                        
-                        // Add to player inventory through GameState
-                        GameState.playerState.inventory.push(itemData);
-                        GameState.playerState.stats.inventoryCount++;
-                        
-                        // Track collected item in world state
-                        const itemId = `${item.itemType}_${item.gridX}_${item.gridY}`;
-                        GameState.worldState.itemsCollected.push(itemId);
-                        
-                        console.log(`Picked up ${item.itemType}! (ID: ${itemId})`);
-                        itemsCollected++;
-                        
-                        // Grant experience for finding items
-                        if (player.gainExperience) {
-                            player.gainExperience(80); // Temporarily high for testing level up
-                        }
-                        
-                        // Handle item effects
-                        handleItemPickup(player, item.itemType);
-                        
-                        k.destroy(item);
-                        
-                        // Shake camera on item pickup
-                        CameraSystem.shake(8, 200);
-                    }
-                });
+        // Unified walkability check via LevelSystem.isWalkable()
+        console.log(`🔧 movePlayer: Checking if can move to (${newGridX}, ${newGridY})`);
+        const canMove = (window.LevelSystem && typeof LevelSystem.isWalkable === 'function')
+            ? LevelSystem.isWalkable(newGridX, newGridY)
+            : !k.get("wall").some(wall => wall.gridX === newGridX && wall.gridY === newGridY);
+        
+        console.log(`🔧 movePlayer: canMove result = ${canMove}`);
+        
+        if (!canMove) {
+            console.log(`🔧 movePlayer: Movement blocked to (${newGridX}, ${newGridY})`);
+            logWalkabilityAt(newGridX, newGridY, "blocked (non-walkable)");
+            return;
+        }
+        
+        // Update grid position
+        player.gridX = newGridX;
+        player.gridY = newGridY;
+        
+        // Update fog of war around player
+        if (window.LevelSystem && typeof LevelSystem.updateFogOfWar === 'function') {
+            try {
+                LevelSystem.updateFogOfWar(k, player.gridX, player.gridY);
+            } catch (err) {
+                console.warn('Fog of war update failed during move:', err);
             }
         }
+        
+        // Calculate pixel position (centered in tile)
+        const newPixelPos = GridUtils.createGridPos(newGridX, newGridY, true);
+        
+        // Animate movement
+        player.playAnimation('walk');
+        player.isMoving = true;
+        
+        // Smooth movement tween with reference
+        player.currentTween = k.tween(player.pos, k.vec2(newPixelPos.x, newPixelPos.y), 0.15, (pos) => {
+            if (player.exists()) {
+                player.pos = pos;
+            }
+        }, k.easings.easeOutQuad).then(() => {
+            if (player.exists()) {
+                player.isMoving = false;
+                player.currentTween = null;
+                player.playAnimation('idle');
+            }
+        });
+        
+        // Item pickup on arrival
+        const items = k.get("item");
+        items.forEach(item => {
+            if (item.gridX === newGridX && item.gridY === newGridY) {
+                const itemData = {
+                    id: `${item.itemType}_${Date.now()}`,
+                    name: item.itemType,
+                    type: item.itemType,
+                    value: getItemValue(item.itemType),
+                    description: getItemDescription(item.itemType)
+                };
+                
+                GameState.playerState.inventory.push(itemData);
+                GameState.playerState.stats.inventoryCount++;
+                
+                const itemId = `${item.itemType}_${item.gridX}_${item.gridY}`;
+                GameState.worldState.itemsCollected.push(itemId);
+                
+                console.log(`Picked up ${item.itemType}! (ID: ${itemId})`);
+                itemsCollected++;
+                
+                if (player.gainExperience) {
+                    player.gainExperience(80); // Temporarily high for testing level up
+                }
+                
+                handleItemPickup(player, item.itemType);
+                
+                k.destroy(item);
+                
+                CameraSystem.shake(8, 200);
+            }
+        });
     }
     
     // Grid-based movement controls with facing updates and animations
@@ -1256,6 +1207,7 @@ k.scene("game", () => {
     let gridVisible = true;
     let freeCameraMode = false;
     let itemsCollected = 0;
+    let spawnPointsVisible = false;
     
     // Item helper functions
     function getItemValue(itemType) {
@@ -1322,6 +1274,41 @@ k.scene("game", () => {
             });
             gridVisible = true;
             console.log("Grid shown");
+        }
+    });
+    
+    // Toggle enemy spawn point debug markers
+    k.onKeyPress("f12", () => {
+        // Respect pause state like other inputs
+        if (window.GameState && typeof window.GameState.isGamePaused === 'function' && window.GameState.isGamePaused()) {
+            console.log('Spawn toggle ignored: game is paused');
+            return;
+        }
+        if (!window.SpawningSystem) {
+            console.warn('⚠️ SpawningSystem not available');
+            return;
+        }
+        
+        if (!spawnPointsVisible) {
+            // Prefer currentLevelData if available
+            const levelData = window.currentLevelData || (window.LevelSystem ? window.LevelSystem.currentLevelData : null);
+            if (!levelData) {
+                console.warn('⚠️ No level data available to show spawn points');
+                return;
+            }
+            const spawnPoints = window.SpawningSystem.getSpawnPointsFromLevel(levelData);
+            if (!spawnPoints || spawnPoints.length === 0) {
+                console.warn('⚠️ No spawn points found in current level');
+                return;
+            }
+            // Use a long duration so markers persist until explicitly hidden
+            window.SpawningSystem.showSpawnPoints(k, spawnPoints, 9999);
+            spawnPointsVisible = true;
+            console.log(`🐾 Spawn point debug: shown (${spawnPoints.length})`);
+        } else {
+            window.SpawningSystem.hideSpawnPoints(k);
+            spawnPointsVisible = false;
+            console.log('🐾 Spawn point debug: hidden');
         }
     });
     
@@ -1574,6 +1561,11 @@ k.scene("game", () => {
             if (window.CombatSystem) {
                 CombatSystem.update(k, deltaTime);
             }
+            
+            // Update interaction system
+            if (window.InteractionSystem) {
+                InteractionSystem.update();
+            }
         } catch (error) {
             console.error('Error in main update loop:', error);
         }
@@ -1627,6 +1619,7 @@ k.scene("game", () => {
             `Zoom: ${cameraZoom.toFixed(2)}x\n` +
             `Mode: ${freeCameraMode ? 'Free' : 'Follow'}\n` +
             `Grid: ${gridVisible ? 'On' : 'Off'}\n` +
+            `Spawns: ${spawnPointsVisible ? 'On' : 'Off'}\n` +
             `Shake: ${cameraDebug.shake ? 'Active' : 'Off'}`;
         
         // Update player info
@@ -1832,3 +1825,4 @@ console.log("🎭 Scene Management: ENABLED (Menu, Game, Inventory)");
 // TODO: Grid system will be implemented in utils/grid.js
 
 }); // End of DOMContentLoaded event listener
+       

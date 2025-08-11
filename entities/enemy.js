@@ -287,15 +287,25 @@ const EnemyEntity = {
                         const blocked = walls.some(wall => wall.gridX === newGridX && wall.gridY === newGridY);
                         
                         if (!blocked) {
-                            // Check for other enemies at target position
-                            const enemies = k.get("enemy");
-                            const enemyBlocked = enemies.some(enemy => 
-                                enemy !== this && enemy.gridX === newGridX && enemy.gridY === newGridY
+                            // Check for closed doors (enemies can pass through open doors)
+                            const doors = k.get("door");
+                            const doorBlocked = doors.some(door => 
+                                door.gridX === newGridX && door.gridY === newGridY && door.solid
                             );
                             
-                            if (!enemyBlocked) {
-                                this.moveToPosition(newGridX, newGridY);
-                                return true;
+                            if (!doorBlocked) {
+                                // Check for other enemies at target position
+                                const enemies = k.get("enemy");
+                                const enemyBlocked = enemies.some(enemy => 
+                                    enemy !== this && enemy.gridX === newGridX && enemy.gridY === newGridY
+                                );
+                                
+                                if (!enemyBlocked) {
+                                    this.moveToPosition(newGridX, newGridY);
+                                    return true;
+                                }
+                            } else {
+                                console.log(`🚪 ${this.name} blocked by closed door at (${newGridX}, ${newGridY})`);
                             }
                         }
                     }
@@ -306,22 +316,33 @@ const EnemyEntity = {
                 // Actually move to a position with animation
                 moveToPosition(newGridX, newGridY) {
                     this.isMoving = true;
+                    
+                    // Determine facing BEFORE updating grid coords
+                    const oldGridX = this.gridX;
+                    const oldGridY = this.gridY;
+                    const facingDx = newGridX - oldGridX;
+                    const facingDy = newGridY - oldGridY;
+                    if (Math.abs(facingDx) > Math.abs(facingDy)) {
+                        this.updateFacing(facingDx > 0 ? 'right' : 'left');
+                    } else if (facingDy !== 0) {
+                        this.updateFacing(facingDy > 0 ? 'down' : 'up');
+                    }
+                    
+                    // Update grid coordinates and play walk
                     this.gridX = newGridX;
                     this.gridY = newGridY;
                     this.playAnimation('walk');
                     
-                    // Update facing direction
-                    const dx = newGridX - this.gridX;
-                    const dy = newGridY - this.gridY;
-                    if (Math.abs(dx) > Math.abs(dy)) {
-                        this.updateFacing(dx > 0 ? 'right' : 'left');
-                    } else if (dy !== 0) {
-                        this.updateFacing(dy > 0 ? 'down' : 'up');
-                    }
-                    
-                    // Smooth movement animation
-                    const newPixelPos = GridUtils.createGridPos(newGridX, newGridY, false);
+                    // Compute pixel target using centered tile position, then convert to top-left
+                    const center = GridUtils.createGridPos(newGridX, newGridY, true);
+                    const size = this.enemyType.sprite.size;
+                    const newPixelPos = { x: center.x - size / 2 + 1, y: center.y - size / 2 + 1 };
                     const moveSpeed = this.speed * 0.5; // Adjust speed multiplier
+                    
+                    // Debug start
+                    try {
+                        console.log(`[AI] ${this.name} moving ${oldGridX},${oldGridY} -> ${newGridX},${newGridY}; px ${this.pos.x?.toFixed?.(1)},${this.pos.y?.toFixed?.(1)} -> ${newPixelPos.x},${newPixelPos.y}`);
+                    } catch (_) {}
                     
                     k.tween(
                         this.pos,
@@ -332,6 +353,11 @@ const EnemyEntity = {
                     ).then(() => {
                         this.isMoving = false;
                         this.lastMoveTime = k.time();
+                        
+                        // Debug complete
+                        try {
+                            console.log(`[AI] ${this.name} completed move to ${this.gridX},${this.gridY}; pos ${this.pos.x?.toFixed?.(1)},${this.pos.y?.toFixed?.(1)}; isMoving=${this.isMoving}`);
+                        } catch (_) {}
                         
                         // Return to idle animation if not in combat
                         if (this.currentAnimation === 'walk' && this.aiState !== 'chase' && this.aiState !== 'flee') {
