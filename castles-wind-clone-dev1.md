@@ -133,41 +133,6 @@ This document breaks down the Phase 1 (MVP) development tasks from section 9.1 o
 - [x] **ENHANCED**: Item pickup messages with experience point display
 - [x] **ENHANCED**: Fixed all pickup system errors and component issues
 
-#### 3.3.1 Item Effects — Design and Implementation Plan
-**Goal**: Enable consumables and special items to modify entity components (instant and timed effects) safely and with clear feedback.
-
-**Data Model (data/items.js)**
-- [ ] Add `effects` array to consumable items (e.g., health/mana potions, antidotes, stat elixirs):
-  - Shape: `{ type: "heal"|"mana"|"buff_stat"|"cure"|"shield"|"regen"|"damage", stat?: "attack"|"defense"|"speed"|"dexterity"|"strength", amount: number, durationMs?: number }`
-- [ ] Example definitions: Health Potion (heal), Mana Potion (mana), Antidote (cure: "poison"), Strength Elixir (buff_stat+duration), Shield Tonic (shield+duration), Regen Draught (regen+duration)
-
-**Systems (systems/items.js)**
-- [ ] Implement `applyItemEffects(item, target)` to iterate `effects` and modify target components with null-safety
-- [ ] Instant effects: heal/mana/damage adjust `Health`/`Mana` components; clamp to min/max; update HealthBarUI
-- [ ] Timed effects: add/update `StatusEffectComponent` entries with `{ type, amount, expiresAt }`
-- [ ] Cures: remove matching status entries (e.g., poison, slow)
-- [ ] Emit messages via `ui/messages.js` for each applied/removed effect
-- [ ] Robust logging for effect application, clamping, and expirations
-
-**Status Effect Processing (shared/integration)**
-- [ ] Create lightweight `StatusEffectComponent` for entities (player + enemies) to hold active timed effects
-- [ ] Central tick: reuse/integrate with MagicSystem processing loop to avoid duplicate processing; 500ms cadence OK
-- [ ] On expiry: revert stat deltas, remove effect, refresh UI; ensure clean-up if entity destroyed
-
-**UI & Feedback**
-- [ ] Update `ui/examination.js` and tooltips to show effect summaries (e.g., "+15 HP", "+2 STR for 30s")
-- [ ] Ensure inventory Use → effect application path shows result messages and refreshes inventory/UI immediately
-- [ ] Add subtle FX for effects (sparkle/flash) using `k.opacity()` + `lifespan` to satisfy Kaplay deps
-
-**Validation & Safety**
-- [ ] All property access guarded (item, stats, components) to prevent null/undefined errors
-- [ ] Effects stack rules: define merging (e.g., refresh duration vs. additive) per type; document
-- [ ] Prevent using non-usable items; respect quantities and stack consumption
-
-**Testing & Acceptance**
-- [ ] Add debug grants (cheats) to spawn each test consumable quickly
-- [ ] Verify: HP/MP clamps; buffs apply and expire; cures remove statuses; UI updates; no console errors
-- [ ] Verify integration: combat turn flow unaffected; pause/resume unaffected; input handler lifecycle clean
 
 ---
 
@@ -175,21 +140,24 @@ This document breaks down the Phase 1 (MVP) development tasks from section 9.1 o
 
 ### 4.1 Level Generation
 **Files: `levels/level1.js`, `data/leveldata.js`, `systems/levelgen.js`**
-- [ ] Create dungeon layout using Kaplay's `addLevel()` with ASCII art mapping (`levels/level1.js`)
-- [ ] Implement rooms and corridors using Kaplay's tile symbol system (`data/leveldata.js`)
-- [ ] Add treasure placement using Kaplay's level symbols and spawn points (`systems/levelgen.js`)
-- [ ] Create enemy spawn points using Kaplay's level generation callbacks (`systems/spawning.js`)
-- [ ] Implement entrance/exit using Kaplay's special tile components (`data/tiles.js`)
-- [ ] Add environmental features using Kaplay's custom tile behaviors (`systems/environment.js`)
+- [x] Create dungeon layout using Kaplay's `addLevel()` with ASCII art mapping (`levels/level1.js`)
+- [x] Implement rooms and corridors using Kaplay's tile symbol system (`data/leveldata.js`)
+- [x] Add treasure placement using Kaplay's level symbols and spawn points (`systems/levelgen.js`)
+- [x] Create enemy spawn points using Kaplay's level generation callbacks (`systems/spawning.js`)
+- [x] Implement entrance/exit using Kaplay's special tile components (`data/tiles.js`)
+- [x] Add environmental features using Kaplay's custom tile behaviors (`systems/environment.js`)
 
 ### 4.2 Level Progression
 **Files: `systems/progression.js`, `systems/objectives.js`, `utils/saveload.js`**
-- [ ] Create level transitions using Kaplay's `go()` scene switching (`systems/progression.js`)
-- [ ] Implement completion conditions using Kaplay's event system (`systems/objectives.js`)
-- [ ] Add objective tracking using Kaplay's global state management (`systems/objectives.js`)
-- [ ] Create level state persistence using Kaplay's data storage (`utils/saveload.js`)
-- [ ] Implement respawn using Kaplay's scene restart functionality (`systems/progression.js`)
-- [ ] Add exploration tracking using Kaplay's custom components (`systems/exploration.js`)
+- [x] Create level transitions using Kaplay's `go()` scene switching (`systems/progression.js`)
+- [x] Implement completion conditions using Kaplay's event system (`systems/objectives.js`)
+- [x] Add objective tracking using Kaplay's global state management (`systems/objectives.js`)
+- [x] Create level state persistence using Kaplay's data storage (`utils/saveload.js`)
+- [x] Add exploration tracking using Kaplay's custom components (`systems/exploration.js`)
+- [x] **ENHANCED**: Level completion events with Kaplay's trigger system
+- [x] **ENHANCED**: Objective-based progression unlocking with visual feedback
+- [x] **ENHANCED**: Auto-save on level completion with notification system
+- [x] **ENHANCED**: Completion percentage tracking and stair access control
 
 ### 4.3 Interactive Elements
 **Files: `entities/door.js`, `entities/chest.js`, `entities/trap.js`, `systems/interaction.js`**
@@ -199,13 +167,17 @@ This document breaks down the Phase 1 (MVP) development tasks from section 9.1 o
 - [x] **ENHANCED**: Multi-input interaction system (E key, Space key, Right-click mouse)
 - [x] **ENHANCED**: Visual interaction hints and range detection system
 - [x] **ENHANCED**: Integration with level spawning system for automatic door placement
-- [ ] Implement chests using Kaplay's sprite objects with interaction areas (`entities/chest.js`)
-- [ ] Add traps using Kaplay's trigger areas and damage events (`entities/trap.js`)
+- [x] Implement chests using Kaplay's sprite objects with interaction areas (`entities/chest.js`)
+- [x] **ENHANCED**: Comprehensive chest system with locked/unlocked states, key requirements
+- [x] **ENHANCED**: Visual feedback with lid animations and lock indicators
+- [x] **ENHANCED**: Random and custom content generation with gold, items, and experience
+- [x] **ENHANCED**: Integration with inventory system and objective tracking
+- [x] Add traps using Kaplay's trigger areas and damage events (`entities/trap.js`)
 - [x] Implement ground items using Kaplay's pickup collision system (`entities/grounditem.js`)
 - [ ] Add environmental storytelling using Kaplay's text and trigger systems (`systems/storytelling.js`)
 
 ---
-
+ 
 ## Technical Foundation Tasks
 
 ### Project Setup

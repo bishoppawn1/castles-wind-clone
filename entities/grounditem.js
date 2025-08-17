@@ -172,6 +172,19 @@ class GroundItemEntity {
                             window.MessageUI.addMessage(message, "success");
                         }
                         
+                        // Trigger gold collected event for objectives system
+                        if (typeof k !== 'undefined' && k.trigger) {
+                            k.trigger('gold_collected', {
+                                amount: goldAmount,
+                                itemType: 'gold_coin'
+                            });
+                        } else if (typeof kaplay !== 'undefined' && kaplay.trigger) {
+                            kaplay.trigger('gold_collected', {
+                                amount: goldAmount,
+                                itemType: 'gold_coin'
+                            });
+                        }
+                        
                         // Remove the ground item
                         this.destroy();
                         return true;
@@ -189,6 +202,31 @@ class GroundItemEntity {
                         // Award experience if item has experience value
                         if (this.itemData.experience && player.gainExperience) {
                             player.gainExperience(this.itemData.experience);
+                        }
+                        
+                        // Trigger item collected event for objectives system
+                        const itemEventData = {
+                            itemType: this.itemData.id,
+                            category: this.itemData.category,
+                            rarity: this.itemData.rarity,
+                            position: { x: this.gridX, y: this.gridY }
+                        };
+                        
+                        // Try multiple ways to trigger the event
+                        if (typeof k !== 'undefined' && k.trigger) {
+                            k.trigger('item_collected', itemEventData);
+                            console.log('📦 Triggered item_collected via k:', itemEventData);
+                        }
+                        
+                        if (typeof window !== 'undefined' && window.k && typeof window.k.trigger === 'function') {
+                            window.k.trigger('item_collected', itemEventData);
+                            console.log('📦 Triggered item_collected via window.k:', itemEventData);
+                        }
+                        
+                        // Direct call to objectives system as fallback
+                        if (typeof window !== 'undefined' && window.ObjectivesSystem) {
+                            window.ObjectivesSystem.trackObjectiveProgress('item_collected', itemEventData);
+                            console.log('📦 Direct call to ObjectivesSystem for item:', itemEventData);
                         }
                         
                         // Notify systems

@@ -27,6 +27,7 @@ if (typeof CameraSystem === 'undefined') {
 }
 
 // Wait for DOM to be ready before initializing Kaplay
+console.log('📋 Setting up DOMContentLoaded event listener...');
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 DOM loaded, initializing Kaplay...');
     
@@ -60,8 +61,8 @@ const k = kaplay({
     // Don't use letterbox - let it fill the container
     letterbox: false,
     
-    // Background color (dark medieval theme)
-    background: [20, 20, 30],
+    // Background color (dark grey instead of black)
+    background: [80, 80, 90],
     
     // Enable debug mode for development
     debug: true,
@@ -480,6 +481,10 @@ function createDemoLevel(k) {
 // Create a game scene with camera system and larger world
 k.scene("game", () => {
     console.log('📍 GAME SCENE STARTED - This should appear first!');
+    console.log('🔍 Game scene initialization beginning...');
+    
+    // Wrap the entire game scene in a try-catch to catch any errors
+    try {
     
     // Initialize enemy systems FIRST
     console.log('📍 Enemy system initialization at game scene start...');
@@ -638,9 +643,88 @@ k.scene("game", () => {
         console.error('❌ Interaction system not available');
     }
     
-    // Initialize game state manager
-    if (!GameState.isInitialized) {
+    // Initialize chest entity system
+    if (window.ChestEntity) {
+        try {
+            ChestEntity.init(k);
+            console.log('✅ Chest entity system initialized successfully');
+        } catch (error) {
+            console.error('❌ Chest entity system initialization failed:', error);
+        }
+    } else {
+        console.error('❌ Chest entity system not available');
+    }
+    
+    // Initialize objectives system
+    if (window.ObjectivesSystem) {
+        try {
+            ObjectivesSystem.init(k);
+            console.log('✅ Objectives system initialized successfully');
+        } catch (error) {
+            console.error('❌ Objectives system initialization failed:', error);
+        }
+    } else {
+        console.error('❌ Objectives system not available');
+    }
+    
+    // Initialize game state
+    if (typeof GameState !== 'undefined') {
         GameState.init();
+    }
+
+    // Function to check for defeated enemies and track them
+    function checkDefeatedEnemies() {
+        if (typeof window.GameState === 'undefined' || !window.GameState.worldState.enemiesDefeated) {
+            return;
+        }
+        
+        // Get all enemies on the current level
+        const enemies = k.get("enemy");
+        
+        // Debug logging every 120 frames (2 seconds at 60fps) to avoid spam
+        if (Math.floor(k.time() * 0.5) % 2 === 0 && k.time() % 2 < 0.1) {
+            console.log(`🔍 Enemy death check: ${enemies.length} enemies found`);
+        }
+        
+        enemies.forEach(enemy => {
+            // Check if enemy health is 0 or below
+            if (enemy.health !== undefined && enemy.health <= 0) {
+                // Create unique enemy ID - must match spawning system format
+                // Spawning system uses: ${enemyType}_${spawnX}_${spawnY}
+                // Use spawn position (spawnX, spawnY) instead of current position (gridX, gridY)
+                const enemyType = enemy.enemyType?.id || enemy.enemyId || enemy.name?.toLowerCase() || 'enemy';
+                const spawnX = enemy.spawnX !== undefined ? enemy.spawnX : enemy.gridX;
+                const spawnY = enemy.spawnY !== undefined ? enemy.spawnY : enemy.gridY;
+                const enemyId = `${enemyType}_${spawnX}_${spawnY}`;
+                
+                console.log(`⚔️ Enemy defeated: ${enemy.name} at current (${enemy.gridX}, ${enemy.gridY}), spawn (${spawnX}, ${spawnY})`);
+                console.log(`⚔️ Generated enemy ID: ${enemyId}`);
+                
+                // Check if already tracked as defeated
+                if (!window.GameState.worldState.enemiesDefeated.includes(enemyId)) {
+                    // Add to defeated enemies list
+                    window.GameState.worldState.enemiesDefeated.push(enemyId);
+                    console.log(`⚔️ Enemy defeated and tracked: ${enemyId}`);
+                    console.log(`🔍 Defeated enemies array:`, window.GameState.worldState.enemiesDefeated);
+                    
+                    // Award experience and gold to player
+                    const player = k.get("player")[0];
+                    if (player && enemy.experience) {
+                        if (player.gainExperience) {
+                            player.gainExperience(enemy.experience);
+                        }
+                    }
+                    if (player && enemy.gold) {
+                        if (player.gold !== undefined) {
+                            player.gold += enemy.gold;
+                        }
+                    }
+                }
+                
+                // Destroy the enemy entity
+                enemy.destroy();
+            }
+        });
     }
     
     // Add inventory system to game state
@@ -706,12 +790,189 @@ k.scene("game", () => {
     // Load LEVEL_1 with our door modifications
     console.log("🚪 Loading LEVEL_1 to test door system...");
     if (window.LevelSystem && typeof LevelSystem.loadLevel === "function") {
+        console.log("🔍 LevelSystem available, calling loadLevel(k, 1)...");
         LevelSystem.loadLevel(k, 1);
         window.currentLevelData = LevelSystem.currentLevelData;
         console.log("🚪 LEVEL_1 loaded for door testing");
+        console.log("🔍 Current level data:", window.currentLevelData);
+        console.log("🔍 Level walls count:", window.currentLevelData?.walls?.length || 0);
+        console.log("🔍 Level doors count:", window.currentLevelData?.doors?.length || 0);
+        
+        // Initialize ProgressionSystem
+        if (typeof ProgressionSystem !== 'undefined') {
+            ProgressionSystem.init(k);
+            console.log("✅ ProgressionSystem initialized");
+        } else {
+            console.warn("⚠️ ProgressionSystem not available");
+        }
+        
+        // Initialize and generate additional level content
+        if (typeof SystemInitializer !== 'undefined') {
+            SystemInitializer.init(k);
+            SystemInitializer.generateLevelContent(LevelSystem.currentLevelData);
+        } else {
+            console.warn("⚠️ SystemInitializer not available");
+        }
     } else {
-        console.error("❌ LevelSystem not available; cannot load LEVEL_1");
+        console.error("❌ LevelSystem not available or loadLevel function missing!");
+        console.log("🔍 window.LevelSystem:", typeof window.LevelSystem);
+        console.log("🔍 LevelSystem.loadLevel:", window.LevelSystem ? typeof LevelSystem.loadLevel : "LevelSystem undefined");
     }
+        
+        // Check for defeated enemies and track them
+        checkDefeatedEnemies();
+        
+        // Add continuous enemy death tracking in game loop
+        k.onUpdate(() => {
+            checkDefeatedEnemies();
+        });
+        
+        // Debug command to test enemy defeat (press K to kill nearest enemy)
+        k.onKeyPress("k", () => {
+            const enemies = k.get("enemy");
+            if (enemies.length > 0) {
+                const enemy = enemies[0];
+                console.log(`🔧 DEBUG: Setting enemy health to 0 for testing. Enemy: ${enemy.name} at (${enemy.gridX}, ${enemy.gridY}), current health: ${enemy.health}`);
+                enemy.health = 0;
+            }
+        });
+
+        k.onKeyPress("l", () => {
+            console.log("🔄 DEBUG: Reloading level to test enemy persistence");
+            if (window.ProgressionSystem) {
+                ProgressionSystem.transitionToLevel('level_1');
+            }
+        });
+
+        k.onKeyPress("r", () => {
+            console.log("👹 DEBUG: Respawning all enemies (ignoring persistence)");
+            if (typeof SpawningSystem !== 'undefined' && SpawningSystem.forceRespawnAllEnemies) {
+                SpawningSystem.forceRespawnAllEnemies();
+            }
+        });
+
+        k.onKeyPress("t", () => {
+            console.log("🔄 DEBUG: Toggling enemy persistence");
+            if (window.GameState && window.GameState.worldState.enemiesDefeated) {
+                const count = window.GameState.worldState.enemiesDefeated.length;
+                window.GameState.worldState.enemiesDefeated = [];
+                console.log(`🧹 Cleared ${count} defeated enemies from persistence`);
+            }
+        });
+
+        k.onKeyPress("z", () => {
+            console.log("📋 DEBUG: Showing defeated enemies list");
+            if (window.GameState && window.GameState.worldState.enemiesDefeated) {
+                console.log("💀 Defeated enemies:", window.GameState.worldState.enemiesDefeated);
+            }
+        });
+
+        // Debug: Test respawn system (D = trigger death, H = heal player) - DISABLED to prevent accidental health drops
+        // k.onKeyPress("d", () => {
+        //     console.log("💀 DEBUG: Triggering player death for respawn test");
+        //     const player = k.get("player")[0];
+        //     if (player) {
+        //         player.health = 0;
+        //         player.isDead = true;
+        //         if (window.ProgressionSystem) {
+        //             ProgressionSystem.triggerDeathScreen(
+        //                 'Debug death triggered for testing!',
+        //                 'debug'
+        //             );
+        //         }
+        //     }
+        // });
+
+        k.onKeyPress("h", () => {
+            console.log("💚 DEBUG: Healing player to full health");
+            const player = k.get("player")[0];
+            if (player) {
+                player.health = player.maxHealth || 100;
+                player.isDead = false;
+                console.log(`💚 Player healed to ${player.health}/${player.maxHealth}`);
+            }
+        });
+
+        // Removed debug status effect test that was causing health to go to zero
+        
+        // Debug command to check defeated enemies list (press L to list)
+        k.onKeyPress("l", () => {
+            console.log(`🔍 ===== DEBUG COMMAND L PRESSED =====`);
+            console.log(`🔍 DEBUG: GameState exists:`, typeof window.GameState !== 'undefined');
+            console.log(`🔍 DEBUG: GameState.worldState:`, window.GameState?.worldState);
+            console.log(`🔍 DEBUG: Current defeated enemies:`, window.GameState?.worldState?.enemiesDefeated);
+            const enemies = k.get("enemy");
+            console.log(`🔍 DEBUG: Current enemies on level (${enemies.length}):`, enemies.map(e => {
+                const enemyType = e.enemyType?.id || e.enemyId || e.name?.toLowerCase() || 'enemy';
+                const spawnX = e.spawnX !== undefined ? e.spawnX : e.gridX;
+                const spawnY = e.spawnY !== undefined ? e.spawnY : e.gridY;
+                const enemyId = `${enemyType}_${spawnX}_${spawnY}`;
+                return `${e.name} at current (${e.gridX}, ${e.gridY}), spawn (${spawnX}, ${spawnY}), health: ${e.health}, ID: ${enemyId}`;
+            }));
+            console.log(`🔍 DEBUG: Enemy properties:`, enemies.length > 0 ? enemies[0] : 'No enemies');
+            console.log(`🔍 ===== END DEBUG COMMAND =====`);
+        });
+        
+        // Debug command to manually test level reload (press R to reload level)
+        k.onKeyPress("r", () => {
+            console.log(`🔄 DEBUG: Manually reloading level to test enemy persistence...`);
+            if (window.LevelSystem && typeof LevelSystem.loadLevel === "function") {
+                LevelSystem.loadLevel(k, 1);
+                console.log(`🔄 DEBUG: Level reloaded`);
+            }
+        });
+        
+        // Comprehensive test command (press T to run full test)
+        k.onKeyPress("t", () => {
+            console.log(`🧪 RUNNING COMPREHENSIVE ENEMY PERSISTENCE TEST`);
+            console.log(`🧪 Step 1: Check current enemies`);
+            const enemies = k.get("enemy");
+            console.log(`🧪 Found ${enemies.length} enemies:`, enemies.map(e => `${e.name} at (${e.gridX}, ${e.gridY}) health: ${e.health}`));
+            
+            console.log(`🧪 Step 2: Check current defeated enemies list`);
+            console.log(`🧪 Defeated enemies:`, window.GameState.worldState.enemiesDefeated);
+            
+            if (enemies.length > 0) {
+                console.log(`🧪 Step 3: Defeating first enemy for test`);
+                const enemy = enemies[0];
+                const enemyType = enemy.enemyType?.id || enemy.enemyId || enemy.name?.toLowerCase() || 'enemy';
+                const spawnX = enemy.spawnX !== undefined ? enemy.spawnX : enemy.gridX;
+                const spawnY = enemy.spawnY !== undefined ? enemy.spawnY : enemy.gridY;
+                const enemyId = `${enemyType}_${spawnX}_${spawnY}`;
+                console.log(`🧪 Enemy ID will be: ${enemyId}`);
+                console.log(`🧪 Enemy details:`, {
+                    name: enemy.name,
+                    enemyType: enemy.enemyType,
+                    enemyId: enemy.enemyId,
+                    currentPos: `(${enemy.gridX}, ${enemy.gridY})`,
+                    spawnPos: `(${spawnX}, ${spawnY})`,
+                    health: enemy.health
+                });
+                enemy.health = 0;
+                console.log(`🧪 Enemy health set to 0, should be processed next frame`);
+                
+                // Wait a moment then check if it was tracked
+                setTimeout(() => {
+                    console.log(`🧪 Step 4: Checking if enemy was tracked as defeated`);
+                    console.log(`🧪 Defeated enemies after defeat:`, window.GameState.worldState.enemiesDefeated);
+                    console.log(`🧪 Remaining enemies:`, k.get("enemy").map(e => `${e.name} at (${e.gridX}, ${e.gridY})`));
+                    
+                    console.log(`🧪 Step 5: Reloading level to test persistence`);
+                    if (window.LevelSystem && typeof LevelSystem.loadLevel === "function") {
+                        LevelSystem.loadLevel(k, 1);
+                        
+                        setTimeout(() => {
+                            console.log(`🧪 Step 6: Checking enemies after level reload`);
+                            const newEnemies = k.get("enemy");
+                            console.log(`🧪 Enemies after reload:`, newEnemies.map(e => `${e.name} at (${e.gridX}, ${e.gridY})`));
+                            console.log(`🧪 TEST COMPLETE: Enemy persistence ${newEnemies.length < enemies.length ? 'WORKING' : 'NOT WORKING'}`);
+                        }, 1000);
+                    }
+                }, 1000);
+            } else {
+                console.log(`🧪 No enemies found to test with`);
+            }
+        });
     
     // Draw debug grid (optional)
     let levelGridVisible = false;
@@ -725,7 +986,7 @@ k.scene("game", () => {
     // Create player at dungeon spawn
     const spawn = (window.LevelSystem && typeof LevelSystem.getPlayerSpawn === "function")
         ? LevelSystem.getPlayerSpawn()
-        : (window.currentLevelData && window.currentLevelData.playerSpawn) ? window.currentLevelData.playerSpawn : { x: 23, y: 17 };
+        : (window.currentLevelData && window.currentLevelData.playerSpawn) ? window.currentLevelData.playerSpawn : { x: 2, y: 2 };
     const playerGridPos = { x: spawn.x, y: spawn.y };
     console.log("🧍 Spawning player at", playerGridPos);
     const player = PlayerEntity.create(k, playerGridPos.x, playerGridPos.y, {
@@ -789,6 +1050,13 @@ k.scene("game", () => {
         console.log('✅ SpawningSystem initialized');
     } else {
         console.error('❌ SpawningSystem not available');
+    }
+    
+    if (window.StatusEffectSystem) {
+        StatusEffectSystem.init(k);
+        console.log('✅ StatusEffectSystem initialized');
+    } else {
+        console.error('❌ StatusEffectSystem not available');
     }
     
     // Spawn test enemies
@@ -991,14 +1259,6 @@ k.scene("game", () => {
         k.z(100)
     ]);
     
-    // Title (fixed position)
-    uiLayer.add([
-        k.text("CAMERA SYSTEM DEMO"),
-        k.pos(k.width() / 2, 20),
-        k.anchor("center"),
-        k.scale(0.4),
-        k.color(220, 180, 100)
-    ]);
     
     // Controls info (fixed position)
     uiLayer.add([
@@ -1078,15 +1338,12 @@ k.scene("game", () => {
         }
         
         // Unified walkability check via LevelSystem.isWalkable()
-        console.log(`🔧 movePlayer: Checking if can move to (${newGridX}, ${newGridY})`);
-        const canMove = (window.LevelSystem && typeof LevelSystem.isWalkable === 'function')
-            ? LevelSystem.isWalkable(newGridX, newGridY)
-            : !k.get("wall").some(wall => wall.gridX === newGridX && wall.gridY === newGridY);
+        const canMove = LevelSystem.isWalkable(newGridX, newGridY);
         
-        console.log(`🔧 movePlayer: canMove result = ${canMove}`);
+        // console.log(`🔧 movePlayer: canMove result = ${canMove}`);
         
         if (!canMove) {
-            console.log(`🔧 movePlayer: Movement blocked to (${newGridX}, ${newGridY})`);
+            // console.log(`🔧 movePlayer: Movement blocked to (${newGridX}, ${newGridY})`);
             logWalkabilityAt(newGridX, newGridY, "blocked (non-walkable)");
             return;
         }
@@ -1094,6 +1351,26 @@ k.scene("game", () => {
         // Update grid position
         player.gridX = newGridX;
         player.gridY = newGridY;
+        
+        // Trigger player moved event for objectives system
+        const playerMoveData = {
+            position: { x: newGridX, y: newGridY },
+            direction: { dx: dx, dy: dy }
+        };
+        
+        // Try multiple ways to trigger the event
+        if (typeof k !== 'undefined' && k.trigger) {
+            k.trigger('player_moved', playerMoveData);
+        }
+        
+        if (typeof window !== 'undefined' && window.k && typeof window.k.trigger === 'function') {
+            window.k.trigger('player_moved', playerMoveData);
+        }
+        
+        // Direct call to objectives system as fallback
+        if (typeof window !== 'undefined' && window.ObjectivesSystem) {
+            window.ObjectivesSystem.trackObjectiveProgress('player_moved', playerMoveData);
+        }
         
         // Update fog of war around player
         if (window.LevelSystem && typeof LevelSystem.updateFogOfWar === 'function') {
@@ -1136,13 +1413,41 @@ k.scene("game", () => {
                     description: getItemDescription(item.itemType)
                 };
                 
+                // Ensure GameState structure is properly initialized
+                if (!GameState.playerState) {
+                    console.warn('⚠️ GameState.playerState was undefined, reinitializing...');
+                    GameState.playerState = {
+                        inventory: [],
+                        stats: { inventoryCount: 0 }
+                    };
+                }
+                if (!GameState.playerState.inventory) {
+                    console.warn('⚠️ GameState.playerState.inventory was undefined, reinitializing...');
+                    GameState.playerState.inventory = [];
+                }
+                if (!GameState.playerState.stats) {
+                    console.warn('⚠️ GameState.playerState.stats was undefined, reinitializing...');
+                    GameState.playerState.stats = { inventoryCount: 0 };
+                }
+                if (!GameState.worldState) {
+                    console.warn('⚠️ GameState.worldState was undefined, reinitializing...');
+                    GameState.worldState = {
+                        itemsCollected: []
+                    };
+                }
+                if (!GameState.worldState.itemsCollected) {
+                    console.warn('⚠️ GameState.worldState.itemsCollected was undefined, reinitializing...');
+                    GameState.worldState.itemsCollected = [];
+                }
+                
                 GameState.playerState.inventory.push(itemData);
                 GameState.playerState.stats.inventoryCount++;
                 
                 const itemId = `${item.itemType}_${item.gridX}_${item.gridY}`;
                 GameState.worldState.itemsCollected.push(itemId);
                 
-                console.log(`Picked up ${item.itemType}! (ID: ${itemId})`);
+                console.log(`🎒 Picked up ${item.itemType}! (ID: ${itemId})`);
+                console.log(`🔍 Items collected array now:`, GameState.worldState.itemsCollected);
                 itemsCollected++;
                 
                 if (player.gainExperience) {
@@ -1184,6 +1489,49 @@ k.scene("game", () => {
         movePlayer(1, 0);
     });
     
+    // Magic system controls
+    k.onKeyPress("z", () => {
+        if (window.GameState && window.GameState.isGamePaused()) return;
+        if (window.magicSystem) {
+            magicSystem.selectSchool('fire');
+        }
+    });
+    
+    k.onKeyPress("x", () => {
+        if (window.GameState && window.GameState.isGamePaused()) return;
+        if (window.magicSystem) {
+            magicSystem.selectSchool('ice');
+        }
+    });
+    
+    k.onKeyPress("c", () => {
+        if (window.GameState && window.GameState.isGamePaused()) return;
+        if (window.magicSystem) {
+            magicSystem.selectSchool('lightning');
+        }
+    });
+    
+    k.onKeyPress("v", () => {
+        if (window.GameState && window.GameState.isGamePaused()) return;
+        if (window.magicSystem) {
+            magicSystem.selectSchool('poison');
+        }
+    });
+    
+    k.onKeyPress("b", () => {
+        if (window.GameState && window.GameState.isGamePaused()) return;
+        if (window.magicSystem) {
+            magicSystem.selectSchool('heal');
+        }
+    });
+    
+    k.onKeyPress("n", () => {
+        if (window.GameState && window.GameState.isGamePaused()) return;
+        if (window.magicSystem) {
+            magicSystem.selectSchool('protect');
+        }
+    });
+    
     // Combat attack
     k.onKeyPress("space", () => {
         if (window.GameState && window.GameState.isGamePaused()) {
@@ -1200,6 +1548,33 @@ k.scene("game", () => {
                 CameraSystem.shake(15, 300);
             }
             console.log("⚔️ Player attacks!");
+        }
+    });
+    
+    // Debug key bindings
+    k.onKeyPress("t", () => {
+        console.log("🧪 Debug: Testing objectives system...");
+        if (window.ObjectivesSystem) {
+            ObjectivesSystem.debugCurrentObjective();
+            
+            ObjectivesSystem.debugListObjectivePool();
+        }
+    });
+    
+    k.onKeyPress("f3", () => {
+        if (window.ObjectivesSystem) {
+            // Test enemy defeated event
+            ObjectivesSystem.debugTriggerEvent('enemy_defeated', {
+                enemyType: 'goblin',
+                enemyId: 'test_goblin_1'
+            });
+        }
+    });
+    
+    k.onKeyPress("f4", () => {
+        if (window.ObjectivesSystem) {
+            // Force complete current objective
+            ObjectivesSystem.forceCompleteObjective();
         }
     });
     
@@ -1277,44 +1652,49 @@ k.scene("game", () => {
         }
     });
     
-    // Toggle enemy spawn point debug markers
-    k.onKeyPress("f12", () => {
-        // Respect pause state like other inputs
-        if (window.GameState && typeof window.GameState.isGamePaused === 'function' && window.GameState.isGamePaused()) {
-            console.log('Spawn toggle ignored: game is paused');
-            return;
-        }
-        if (!window.SpawningSystem) {
-            console.warn('⚠️ SpawningSystem not available');
-            return;
-        }
-        
-        if (!spawnPointsVisible) {
-            // Prefer currentLevelData if available
-            const levelData = window.currentLevelData || (window.LevelSystem ? window.LevelSystem.currentLevelData : null);
-            if (!levelData) {
-                console.warn('⚠️ No level data available to show spawn points');
-                return;
-            }
-            const spawnPoints = window.SpawningSystem.getSpawnPointsFromLevel(levelData);
-            if (!spawnPoints || spawnPoints.length === 0) {
-                console.warn('⚠️ No spawn points found in current level');
-                return;
-            }
-            // Use a long duration so markers persist until explicitly hidden
-            window.SpawningSystem.showSpawnPoints(k, spawnPoints, 9999);
-            spawnPointsVisible = true;
-            console.log(`🐾 Spawn point debug: shown (${spawnPoints.length})`);
-        } else {
-            window.SpawningSystem.hideSpawnPoints(k);
-            spawnPointsVisible = false;
-            console.log('🐾 Spawn point debug: hidden');
-        }
-    });
+    // Toggle enemy spawn point debug markers (DISABLED - causing visual artifacts)
+    // k.onKeyPress("f12", () => {
+    //     // Respect pause state like other inputs
+    //     if (window.GameState && typeof window.GameState.isGamePaused === 'function' && window.GameState.isGamePaused()) {
+    //         console.log('Spawn toggle ignored: game is paused');
+    //         return;
+    //     }
+    //     if (!window.SpawningSystem) {
+    //         console.warn('⚠️ SpawningSystem not available');
+    //         return;
+    //     }
+    //     
+    //     if (!spawnPointsVisible) {
+    //         // Prefer currentLevelData if available
+    //         const levelData = window.currentLevelData || (window.LevelSystem ? window.LevelSystem.currentLevelData : null);
+    //         if (!levelData) {
+    //             console.warn('⚠️ No level data available to show spawn points');
+    //             return;
+    //         }
+    //         const spawnPoints = window.SpawningSystem.getSpawnPointsFromLevel(levelData);
+    //         if (!spawnPoints || spawnPoints.length === 0) {
+    //             console.warn('⚠️ No spawn points found in current level');
+    //             return;
+    //         }
+    //         // Use a long duration so markers persist until explicitly hidden
+    //         window.SpawningSystem.showSpawnPoints(k, spawnPoints, 9999);
+    //         spawnPointsVisible = true;
+    //         console.log(`🐾 Spawn point debug: shown (${spawnPoints.length})`);
+    //     } else {
+    //         window.SpawningSystem.hideSpawnPoints(k);
+    //         spawnPointsVisible = false;
+    //         console.log('🐾 Spawn point debug: hidden');
+    //     }
+    // });
     
 
     
 
+    
+    // Clear any existing debug spawn markers on game start
+    if (window.SpawningSystem) {
+        window.SpawningSystem.hideSpawnPoints(k);
+    }
     
     // Test hurt animation
     k.onKeyPress("h", () => {
@@ -1328,10 +1708,82 @@ k.scene("game", () => {
         console.log("⭐ Player level up animation!");
     });
     
+    // Debug: Test treasure hunter achievement
+    k.onKeyPress("t", () => {
+        console.log("🧪 Testing treasure hunter achievement...");
+        if (window.ObjectivesSystem) {
+            const currentObj = window.ObjectivesSystem.getCurrentObjective();
+            console.log("📊 Current objective:", currentObj);
+            
+            // Force assign treasure hunter objective if not active
+            if (!currentObj || currentObj.id !== 'open_chests') {
+                console.log("🎯 Forcing treasure hunter objective...");
+                window.ObjectivesSystem.currentObjective = {
+                    id: 'open_chests',
+                    title: 'Treasure Hunter',
+                    description: 'Open treasure chests',
+                    type: 'interaction',
+                    target: 2,
+                    trackEvent: 'chest_opened',
+                    trackCondition: () => true,
+                    current: 0,
+                    completed: false,
+                    startTime: Date.now()
+                };
+                window.ObjectivesSystem.displayObjective();
+            }
+            
+            console.log("🎯 Manually triggering chest_opened event...");
+            k.trigger('chest_opened', {
+                chest: { chestType: 'wooden', contents: [] },
+                player: player
+            });
+        } else {
+            console.log("❌ ObjectivesSystem not available");
+        }
+    });
+    
+    // Debug: Show objectives system status
+    k.onKeyPress("o", () => {
+        console.log("📊 === OBJECTIVES SYSTEM STATUS ===");
+        if (window.ObjectivesSystem) {
+            window.ObjectivesSystem.debugShowObjectiveInfo();
+            console.log("🏆 Completed objectives:", window.ObjectivesSystem.getCompletedCount());
+        } else {
+            console.log("❌ ObjectivesSystem not available");
+        }
+    });
+    
+    // Debug: Force treasure hunter objective
+    k.onKeyPress("f", () => {
+        console.log("🎯 Forcing Treasure Hunter objective...");
+        if (window.ObjectivesSystem) {
+            // Clear current objective
+            window.ObjectivesSystem.currentObjective = null;
+            k.destroyAll("objective_display");
+            
+            // Set treasure hunter objective
+            window.ObjectivesSystem.currentObjective = {
+                id: 'open_chests',
+                title: 'Treasure Hunter',
+                description: 'Open treasure chests',
+                type: 'interaction',
+                target: 2,
+                trackEvent: 'chest_opened',
+                trackCondition: () => true,
+                current: 0,
+                completed: false,
+                startTime: Date.now()
+            };
+            window.ObjectivesSystem.displayObjective();
+            console.log("✅ Treasure Hunter objective is now active!");
+        }
+    });
+    
     // Help key
     k.onKeyPress("h", () => {
         if (window.MessageSystem) {
-            window.MessageSystem.addMessage('Help: WASD to move, SPACE to attack, I for inventory', 'info');
+            window.MessageSystem.addMessage('Help: WASD to move, SPACE to attack, I for inventory, F to force treasure hunter objective, T to test chest event, O for objective status', 'info');
         }
     });
     
@@ -1637,7 +2089,10 @@ k.scene("game", () => {
             `Facing: ${player.facing}`;
     });
     
-    k.onKeyPress("escape", () => k.go("menu"));
+    k.onKeyPress("escape", () => {
+        console.log("🔑 ESCAPE key pressed - returning to menu");
+        k.go("menu");
+    });
     
     console.log("🎮 Game scene created with camera system demo");
     console.log("📷 Camera following player at", CameraSystem.getPosition());
@@ -1648,7 +2103,6 @@ k.scene("game", () => {
         console.log("🔄 Restoring saved state to newly created objects...");
         GameState.restoreState(k);
     }
-});
 
 // Create inventory overlay function
 function createInventoryOverlay(k, player, closeCallback) {
@@ -1795,6 +2249,11 @@ function createInventoryOverlay(k, player, closeCallback) {
 // Create inventory scene
 createInventoryScene(k);
 
+
+
+// Create game over scene
+createGameOverScene(k);
+
 // Debug canvas information
 const gameCanvas = document.getElementById('game-canvas');
 console.log(" Canvas element:", gameCanvas);
@@ -1803,11 +2262,8 @@ console.log(" Canvas style:", gameCanvas.style.cssText);
 const ctx = gameCanvas.getContext('2d');
 console.log("🎨 Canvas context:", ctx);
 
-// Start with the menu scene for proper New Game functionality
-console.log("🔄 About to switch to menu scene...");
+// Debug: Scene information
 console.log("🔍 Available scenes:", k.getScenes ? k.getScenes() : "getScenes not available");
-k.go("menu");
-console.log("✅ k.go('menu') called - should now be in menu scene");
 console.log("🔍 Current scene:", k.getSceneName ? k.getSceneName() : "getSceneName not available");
 
 // Log successful initialization with scene management
@@ -1824,5 +2280,215 @@ console.log("🎭 Scene Management: ENABLED (Menu, Game, Inventory)");
 // TODO: Asset loading will be implemented in assets.js
 // TODO: Grid system will be implemented in utils/grid.js
 
+        console.log('✅ Game scene initialization completed successfully!');
+        console.log('🎮 Game should now be playable - staying in game scene');
+        
+        // Add a check to see if we're still in the game scene after a short delay
+        setTimeout(() => {
+            console.log('🔍 Scene check after 1 second:', k.getSceneName ? k.getSceneName() : 'unknown');
+            if (k.getSceneName && k.getSceneName() !== 'game') {
+                console.error('❌ Scene changed unexpectedly from game to:', k.getSceneName());
+            }
+        }, 1000);
+
+    } catch (error) {
+        console.error('❌ CRITICAL ERROR in game scene:', error);
+        console.error('❌ Error stack:', error.stack);
+        console.log('🔄 Reverting to menu due to game scene error...');
+        k.go("menu");
+    }
+
+}); // End of game scene
+
+// Create the original detailed menu scene
+k.scene("menu", () => {
+    // Clear any existing objects
+    k.destroyAll();
+    
+    // Background
+    k.add([
+        k.rect(k.width(), k.height()),
+        k.color(15, 15, 25), // Dark blue background
+        k.pos(0, 0),
+        k.z(-10)
+    ]);
+    
+    // Title
+    k.add([
+        k.text("CASTLES OF THE WIND", {
+            size: 48,
+            font: "monospace",
+            weight: "bold"
+        }),
+        k.pos(k.width() / 2, 120),
+        k.anchor("center"),
+        k.color(220, 180, 100), // Golden color
+        "title"
+    ]);
+    
+    // Subtitle
+    k.add([
+        k.text("A Classic Roguelike Adventure", {
+            size: 24,
+            font: "monospace"
+        }),
+        k.pos(k.width() / 2, 180),
+        k.anchor("center"),
+        k.color(180, 180, 180),
+        "subtitle"
+    ]);
+    
+    // Menu options
+    const menuOptions = [
+        { 
+            text: "New Game", 
+            action: () => {
+                console.log("🔄 New Game button clicked!");
+                console.log("🔍 Checking GameState availability:", !!window.GameState);
+                console.log("🔍 GameState object:", window.GameState);
+                
+                // Reset game state for a fresh start
+                if (window.GameState) {
+                    console.log("✅ GameState found - calling resetForNewGame()");
+                    console.log("🔄 Starting new game - resetting state...");
+                    try {
+                        GameState.resetForNewGame();
+                        console.log("✅ resetForNewGame() completed");
+                    } catch (error) {
+                        console.error("❌ Error in resetForNewGame():", error);
+                    }
+                } else {
+                    console.error("❌ GameState not available on window object!");
+                }
+                
+                console.log("🎮 About to switch to game scene...");
+                console.log("🔍 Current scene before switch:", k.getSceneName ? k.getSceneName() : "unknown");
+                
+                try {
+                    k.go("game");
+                    console.log("✅ k.go('game') called successfully");
+                } catch (error) {
+                    console.error("❌ Error calling k.go('game'):", error);
+                }
+            }
+        },
+        { text: "Load Game", action: () => console.log("Load game not implemented yet") },
+        { text: "Settings", action: () => console.log("Settings not implemented yet") },
+        { text: "Exit", action: () => console.log("Exit game") }
+    ];
+    
+    let selectedOption = 0;
+    
+    // Create menu buttons
+    menuOptions.forEach((option, index) => {
+        const button = k.add([
+            k.text(option.text, {
+                size: 28,
+                font: "monospace"
+            }),
+            k.pos(k.width() / 2, 280 + index * 60),
+            k.anchor("center"),
+            k.color(selectedOption === index ? [255, 255, 100] : [200, 200, 200]),
+            k.area(),
+            "menu-option",
+            { 
+                index: index,
+                action: option.action,
+                isSelected: selectedOption === index
+            }
+        ]);
+        
+        // Mouse hover effect
+        button.onHover(() => {
+            if (selectedOption !== index) {
+                selectedOption = index;
+                updateMenuSelection();
+            }
+        });
+        
+        // Mouse click
+        button.onClick(() => {
+            option.action();
+        });
+    });
+    
+    // Function to update menu selection visual
+    function updateMenuSelection() {
+        k.get("menu-option").forEach((option) => {
+            if (option.index === selectedOption) {
+                option.color = k.rgb(255, 255, 100); // Highlight color
+                option.isSelected = true;
+            } else {
+                option.color = k.rgb(200, 200, 200); // Normal color
+                option.isSelected = false;
+            }
+        });
+    }
+    
+    // Keyboard navigation
+    k.onKeyPress("up", () => {
+        selectedOption = (selectedOption - 1 + menuOptions.length) % menuOptions.length;
+        updateMenuSelection();
+    });
+    
+    k.onKeyPress("down", () => {
+        selectedOption = (selectedOption + 1) % menuOptions.length;
+        updateMenuSelection();
+    });
+    
+    k.onKeyPress("enter", () => {
+        menuOptions[selectedOption].action();
+    });
+    
+    k.onKeyPress("space", () => {
+        menuOptions[selectedOption].action();
+    });
+    
+    // Version info
+    k.add([
+        k.text("v0.1.0 - Phase 1 MVP", {
+            size: 16,
+            font: "monospace"
+        }),
+        k.pos(20, k.height() - 30),
+        k.color(120, 120, 120),
+        "version"
+    ]);
+    
+    // Controls info
+    k.add([
+        k.text("Use ARROW KEYS or MOUSE to navigate • ENTER/SPACE to select", {
+            size: 14,
+            font: "monospace"
+        }),
+        k.pos(k.width() / 2, k.height() - 60),
+        k.anchor("center"),
+        k.color(150, 150, 150),
+        "controls"
+    ]);
+    
+    // Debug info (if debug mode is enabled)
+    if (window.GAME_CONFIG && window.GAME_CONFIG.DEBUG_MODE) {
+        k.add([
+            k.text("DEBUG MODE - Press F1 for debug info", {
+                size: 12,
+                font: "monospace"
+            }),
+            k.pos(k.width() - 20, 20),
+            k.anchor("topright"),
+            k.color(255, 100, 100),
+            "debug-info"
+        ]);
+    }
+    
+    console.log("📋 Menu scene loaded");
+});
+
+// Start the game by going to the menu scene (only on initial load)
+if (!window.gameInitialized) {
+    window.gameInitialized = true;
+    console.log("🚀 Initial game load - going to menu scene");
+    k.go("menu");
+}
+
 }); // End of DOMContentLoaded event listener
-       

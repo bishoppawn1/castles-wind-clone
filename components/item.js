@@ -123,17 +123,36 @@ function createItemComponent(itemData) {
             
             switch (effect.type) {
                 case "heal":
-                    if (target.health && target.maxHealth) {
+                    if (target.health !== undefined && target.maxHealth) {
                         const healAmount = Math.min(effect.amount, target.maxHealth - target.health);
                         target.health += healAmount;
+                        
+                        // Show visual feedback
+                        if (window.MessageSystem) {
+                            window.MessageSystem.addMessage(`Restored ${healAmount} health!`, 'heal');
+                        }
+                        
+                        // Update health bar if available
+                        if (window.HealthBarUI && target.is && target.is('player')) {
+                            window.HealthBarUI.updatePlayerHealthBar();
+                        }
+                        
+                        console.log(`💚 Healed ${healAmount} HP. Health: ${target.health}/${target.maxHealth}`);
                         return { type: "heal", amount: healAmount };
                     }
                     break;
                     
                 case "mana":
-                    if (target.mana && target.maxMana) {
+                    if (target.mana !== undefined && target.maxMana) {
                         const manaAmount = Math.min(effect.amount, target.maxMana - target.mana);
                         target.mana += manaAmount;
+                        
+                        // Show visual feedback
+                        if (window.MessageSystem) {
+                            window.MessageSystem.addMessage(`Restored ${manaAmount} mana!`, 'mana');
+                        }
+                        
+                        console.log(`💙 Restored ${manaAmount} MP. Mana: ${target.mana}/${target.maxMana}`);
                         return { type: "mana", amount: manaAmount };
                     }
                     break;

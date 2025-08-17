@@ -1267,6 +1267,12 @@ class InventoryUI {
         
         // Determine available options
         const options = [];
+        console.log(`🔍 DEBUG: Item properties for ${item.name}:`, {
+            usable: item.usable,
+            consumable: item.consumable,
+            category: item.category,
+            itemId: item.itemId
+        });
         if (item.usable || item.consumable) {
             options.push({
                 key: "use",

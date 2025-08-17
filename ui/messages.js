@@ -189,6 +189,11 @@ const MessageUI = {
     
     // Update message system
     update() {
+        // Check if system is initialized
+        if (!this.messages) {
+            return; // System not initialized yet
+        }
+        
         const currentTime = Date.now();
         
         // Update message opacity and remove expired messages

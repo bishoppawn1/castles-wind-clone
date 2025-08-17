@@ -1,10 +1,7 @@
-// Level data structure for Castles of the Wind Clone
-// Compatible with Kaplay's level system
+// Level data for Castles of the Wind Clone
 
-import { TILE_CONFIG } from './tiles.js';
-
-// Tile symbols for level mapping
-export const TILE_SYMBOLS = {
+// Tile symbol mapping
+const TILE_SYMBOLS = {
     // Floor tiles
     '.': 'floor',
     'f': 'floor_stone',
@@ -40,8 +37,8 @@ export const TILE_SYMBOLS = {
     '@': 'player_spawn'
 };
 
-// Level 1: Tutorial/Starting Area
-export const LEVEL_1 = {
+// Level 1: Castle entrance
+const LEVEL_1 = {
     id: 'level_1',
     name: 'Castle Entrance',
     width: 50,
@@ -85,7 +82,7 @@ export const LEVEL_1 = {
         "#..........................#.#...................#",
         "#..........................#.#...................#",
         "#..........................#.#...................#",
-        "#..........................#.#...................#",
+        "#..........................#E#...................#",
         "#..........................#@#...................#",
         "##################################################"
     ],
@@ -99,32 +96,45 @@ export const LEVEL_1 = {
         { type: 'potion', x: 15, y: 5, effect: 'heal' },
         { type: 'gold', x: 25, y: 10, value: 50 }
     ],
-    
+
     // Enemy spawn points
     enemies: [
+        { type: 'goblin', x: 15, y: 5, level: 1 },
         { type: 'goblin', x: 17, y: 5, level: 1 }
+    ],
+    
+    // Environmental hazards and traps
+    traps: [
+        { type: 'spike_trap', x: 5, y: 15, damage: 10 },   // Left corridor
+        { type: 'spike_trap', x: 15, y: 30, damage: 15 },  // Lower corridor
+        { type: 'spike_trap', x: 35, y: 10, damage: 12 }   // Right side open area
+    ],
+
+    // Stairs for level progression
+    stairs: [
+        { type: 'down', x: 28, y: 35, targetLevel: 'level_2', description: 'Stairs leading deeper into the castle' }
     ],
     
     // Lighting configuration
     lighting: {
-        ambient: 0.3,
+        ambient: 0.8,  // Increased from 0.3 to 0.8 for much better visibility
         torches: [
             { x: 5, y: 5, radius: 5, intensity: 0.8 },
             { x: 20, y: 15, radius: 4, intensity: 0.6 }
         ]
     },
     
-    // Fog of war settings
+    // Fog of war settings - Light fog for exploration without darkness
     fogOfWar: {
         enabled: true,
-        visionRadius: 3,
-        exploredOpacity: 0.7,
-        unexploredOpacity: 0.1
+        visionRadius: 6,  // Large vision area
+        exploredOpacity: 0.95,  // Very bright explored areas
+        unexploredOpacity: 0.6  // Much lighter unexplored areas (was 0.1, now 0.6)
     }
 };
 
 // Level 2: Deeper into the castle
-export const LEVEL_2 = {
+const LEVEL_2 = {
     id: 'level_2',
     name: 'Castle Corridors',
     width: 50,
@@ -134,23 +144,23 @@ export const LEVEL_2 = {
     layout: [
         "##################################################",
         "#................................................#",
-        "#.#####.#####.#####.#####.#####.#####.#####.....#",
+        "#.#####.#####.#####.#####.#####.#####.#####......#",
         "#.#...#.#...#.#...#.#...#.#...#.#...#.#...#.....#",
-        "#.#.g.#.#.o.#.#.r.#.#.s.#.#.T.#.#.C.#.#.A.#.....#",
-        "#.#...#.#...#.#...#.#...#.#...#.#...#.#...#.....#",
-        "#.#D###.#D###.#D###.#D###.#D###.#D###.#D###.....#",
+        "#.#.g.#.#.o.#.#.r.#.#.s.#.#.T.#.#.C.#.#.A.#......#",
+        "#.#...#.#...#.#...#.#...#.#...#.#...#.#...#......#",
+        "#.#D###.#D###.#D###.#D###.#D###.#D###.#D###......#",
         "#................................................#",
         "#................................................#",
-        "#.#####.#####.#####.#####.#####.#####.#####.....#",
-        "#.#...#.#...#.#...#.#...#.#...#.#...#.#...#.....#",
-        "#.#.P.#.#.G.#.#.M.#.#...#.#...#.#...#.#...#.....#",
-        "#.#...#.#...#.#...#.#...#.#...#.#...#.#...#.....#",
-        "#.#D###.#D###.#D###.#D###.#D###.#D###.#D###.....#",
+        "#.#####.#####.#####.#####.#####.#####.#####......#",
+        "#.#...#.#...#.#...#.#...#.#...#.#...#.#...#......#",
+        "#.#.P.#.#.G.#.#.M.#.#...#.#...#.#...#.#...#......#",
+        "#.#...#.#...#.#...#.#...#.#...#.#...#.#...#......#",
+        "#.#D###.#D###.#D###.#D###.#D###.#D###.#D###......#",
         "#................................................#",
         "#................................................#",
         "#................................................#",
         "#@...............................................#",
-        "#................................................#",
+        "#U...............................................#",
         "#................................................#",
         "#................................................#",
         "#................................................#",
@@ -188,9 +198,19 @@ export const LEVEL_2 = {
         { type: 'rat', x: 22, y: 4, level: 1 },
         { type: 'skeleton', x: 29, y: 4, level: 3 }
     ],
+
+    // Stairs for level progression
+    stairs: [
+        { type: 'up', x: 1, y: 18, targetLevel: 'level_1', description: 'Stairs leading back to the castle entrance' }
+    ],
     
     lighting: {
-        ambient: 0.2,
+        ambient: 0.8,  // Increased from 0.2 to 0.8 for much better visibility
+        doors: [
+            { x: 15, y: 10, isOpen: false, locked: false },
+            { x: 20, y: 15, isOpen: false, locked: false },
+            { x: 25, y: 8, isOpen: false, locked: false }
+        ],
         torches: [
             { x: 10, y: 10, radius: 4, intensity: 0.7 },
             { x: 25, y: 10, radius: 4, intensity: 0.7 },
@@ -198,22 +218,43 @@ export const LEVEL_2 = {
         ]
     },
     
+    chests: [
+        { x: 12, y: 8, type: 'wooden', locked: false, contents: [
+            { type: 'gold', amount: 25 },
+            { type: 'item', id: 'health_potion', name: 'Health Potion', category: 'potion' }
+        ]},
+        { x: 30, y: 12, type: 'wooden', locked: true, keyRequired: 'Iron Key', contents: [
+            { type: 'gold', amount: 50 },
+            { type: 'item', name: 'Ring of Strength', category: 'equipment' }
+        ]},
+        { x: 18, y: 20, type: 'wooden', locked: false, contents: [
+            { type: 'experience', amount: 15 },
+            { type: 'item', id: 'mana_potion', name: 'Mana Potion', category: 'potion' }
+        ]},
+        { x: 10, y: 8, type: 'wooden', locked: false, contents: [
+            { type: 'gold', amount: 30 },
+            { type: 'item', id: 'health_potion', name: 'Health Potion', category: 'potion' }
+        ]}
+    ],
+    
     fogOfWar: {
         enabled: true,
-        visionRadius: 3,
-        exploredOpacity: 0.7,
-        unexploredOpacity: 0.05
+        visionRadius: 6,  // Large vision area
+        exploredOpacity: 0.95,  // Very bright explored areas
+        unexploredOpacity: 0.6  // Much lighter unexplored areas for better visibility
     }
 };
 
-// Export all levels
-export const LEVELS = {
+// Global levels object
+const LEVELS = {
     1: LEVEL_1,
-    2: LEVEL_2
+    level_1: LEVEL_1,
+    2: LEVEL_2,
+    level_2: LEVEL_2
 };
 
 // Level utilities
-export const LevelUtils = {
+const LevelUtils = {
     // Get tile type at position
     getTileAt(level, x, y) {
         if (y < 0 || y >= level.layout.length || x < 0 || x >= level.layout[0].length) {
@@ -242,9 +283,9 @@ export const LevelUtils = {
         const tileType = this.getTileAt(level, x, y);
         if (!tileType || tileType === 'unknown') return false;
 
-        // Prefer tile configuration if available
-        if (typeof TILE_CONFIG === 'object' && TILE_CONFIG[tileType]) {
-            return !!TILE_CONFIG[tileType].walkable;
+        // Prefer tile configuration if available globally
+        if (typeof window !== 'undefined' && window.TILE_CONFIG && window.TILE_CONFIG[tileType]) {
+            return !!window.TILE_CONFIG[tileType].walkable;
         }
 
         // Fallback list for environments without TILE_CONFIG
@@ -277,3 +318,12 @@ export const LevelUtils = {
         };
     }
 };
+
+// Make LEVELS, TILE_SYMBOLS, and LevelUtils globally available
+if (typeof window !== 'undefined') {
+    window.LEVELS = LEVELS;
+    window.TILE_SYMBOLS = TILE_SYMBOLS;
+    window.LevelUtils = LevelUtils;
+}
+
+console.log('📊 Level data loaded successfully');

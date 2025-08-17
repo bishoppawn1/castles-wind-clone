@@ -2,42 +2,42 @@
 // Defines tile properties and creates tile game objects
 
 // Tile configurations
-export const TILE_CONFIG = {
-    // Floor tiles
+const TILE_CONFIG = {
+    // Floor tiles - Very bright colors for maximum visibility
     floor: {
-        color: [60, 60, 80],
+        color: [160, 160, 160],  // Neutral light grey
         solid: false,
         walkable: true,
         description: 'Stone floor'
     },
     floor_stone: {
-        color: [70, 70, 90],
+        color: [170, 170, 170],  // Light grey polished stone
         solid: false,
         walkable: true,
         description: 'Polished stone floor'
     },
     floor_wood: {
-        color: [80, 60, 40],
+        color: [160, 160, 160],  // Desaturated grey wooden floor
         solid: false,
         walkable: true,
         description: 'Wooden floor'
     },
     
-    // Wall tiles
+    // Wall tiles - Medium grey for good contrast without being too bright
     wall: {
-        color: [40, 40, 40],
+        color: [100, 100, 100],  // Medium grey walls
         solid: true,
         walkable: false,
         description: 'Stone wall'
     },
     wall_stone: {
-        color: [50, 50, 50],
+        color: [110, 110, 110],  // Slightly lighter stone walls
         solid: true,
         walkable: false,
         description: 'Reinforced stone wall'
     },
     wall_brick: {
-        color: [60, 40, 30],
+        color: [120, 90, 70],  // Medium brown brick walls
         solid: true,
         walkable: false,
         description: 'Brick wall'
@@ -82,7 +82,7 @@ export const TILE_CONFIG = {
 };
 
 // Tile creation utilities
-export const TileSystem = {
+const TileSystem = {
     // Create a tile game object
     createTile(k, tileType, gridX, gridY, tileSize = 32) {
         const config = TILE_CONFIG[tileType];
@@ -99,11 +99,19 @@ export const TileSystem = {
         if (typeof tileType === "string" && tileType.startsWith("wall")) {
             genericTags.push("wall");
         }
+        // Force neutral grey colors for floor and maintain medium grey for walls
+        let finalColor = config.color;
+        if (typeof tileType === 'string' && (tileType === 'floor' || tileType.startsWith('floor'))) {
+            finalColor = [160, 160, 160]; // Neutral light grey floors
+        } else if (typeof tileType === 'string' && (tileType === 'wall' || tileType.startsWith('wall'))) {
+            finalColor = [120, 120, 120]; // Medium grey walls
+        }
+        
         // Build component list so we can conditionally attach components
         const components = [
             k.rect(tileSize, tileSize),
-            k.color(...config.color),
-            k.opacity(1),
+            k.color(...finalColor), // Use forced colors
+            k.opacity(1), // Always full opacity
             k.pos(pixelX, pixelY),
             k.anchor("center"),
             k.z(0), // Tiles are at the bottom layer
@@ -118,15 +126,12 @@ export const TileSystem = {
                 walkable: config.walkable,
                 description: config.description,
                 interactive: config.interactive || false,
-                // Preserve the original color so lighting can be applied reliably
-                baseColor: Array.isArray(config.color) ? [...config.color] : [255, 255, 255]
+                // Preserve the forced color
+                baseColor: Array.isArray(finalColor) ? [...finalColor] : [255, 255, 255]
             }
         ];
         
-        // Add outline for better visibility on solid tiles
-        if (config.solid) {
-            components.push(k.outline(2, k.rgb(20, 20, 20)));
-        }
+        // Removed outline for better performance - outlines are expensive to render
         
         const tile = k.add(components);
         return tile;
@@ -190,25 +195,22 @@ export const TileSystem = {
         return k.get(tileType);
     },
     
-    // Add lighting effect to tile
+    // Add lighting effect to tile - DISABLED to prevent darkening
     addLighting(k, tile, intensity = 1.0) {
-        const base = Array.isArray(tile.baseColor) ? tile.baseColor : [255, 255, 255];
-        const lightedColor = [
-            Math.min(255, Math.floor(base[0] * intensity)),
-            Math.min(255, Math.floor(base[1] * intensity)),
-            Math.min(255, Math.floor(base[2] * intensity))
-        ];
-        tile.color = k.rgb(...lightedColor);
+        // Disabled lighting system to prevent tiles from being darkened
+        // Keep tiles at their original bright colors
+        return; // Do nothing - preserve original tile colors
     },
     
-    // Apply fog of war to tile
+    // Apply fog of war to tile - DISABLED for better visibility
     applyFogOfWar(tile, visibility = 0.1) {
-        tile.opacity = visibility;
+        // Disabled fog of war opacity on tiles to prevent black squares
+        tile.opacity = 1.0; // Always keep tiles fully visible
     },
     
-    // Remove fog of war from tile
+    // Remove fog of war from tile - ALWAYS FULL VISIBILITY
     revealTile(tile, visibility = 1.0) {
-        tile.opacity = visibility;
+        tile.opacity = 1.0; // Always keep tiles fully visible regardless of visibility parameter
     },
     
     // Highlight tile (for interaction feedback)
@@ -225,7 +227,7 @@ export const TileSystem = {
 };
 
 // Interactive tile behaviors
-export const TileInteractions = {
+const TileInteractions = {
     // Handle tile interaction
     interact(k, tile, player) {
         if (!tile.interactive) return false;
@@ -278,3 +280,12 @@ export const TileInteractions = {
         return true;
     }
 };
+
+// Make globally available
+if (typeof window !== 'undefined') {
+    window.TILE_CONFIG = TILE_CONFIG;
+    window.TileSystem = TileSystem;
+    window.TileInteractions = TileInteractions;
+}
+
+console.log('🧱 Tile System loaded successfully');

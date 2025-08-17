@@ -221,7 +221,7 @@ const EnemyEntity = {
                     if (this.currentAnimation !== animationType) {
                         this.currentAnimation = animationType;
                         this.animationTime = 0;
-                        console.log(`🎭 ${this.name} playing animation: ${animationType}`);
+                        // console.log(`🎭 ${this.name} playing animation: ${animationType}`); // Disabled for performance
                     }
                 },
                 
@@ -339,10 +339,8 @@ const EnemyEntity = {
                     const newPixelPos = { x: center.x - size / 2 + 1, y: center.y - size / 2 + 1 };
                     const moveSpeed = this.speed * 0.5; // Adjust speed multiplier
                     
-                    // Debug start
-                    try {
-                        console.log(`[AI] ${this.name} moving ${oldGridX},${oldGridY} -> ${newGridX},${newGridY}; px ${this.pos.x?.toFixed?.(1)},${this.pos.y?.toFixed?.(1)} -> ${newPixelPos.x},${newPixelPos.y}`);
-                    } catch (_) {}
+                    // Debug start (disabled for performance)
+                    // console.log(`[AI] ${this.name} moving ${oldGridX},${oldGridY} -> ${newGridX},${newGridY}`);
                     
                     k.tween(
                         this.pos,
@@ -354,10 +352,8 @@ const EnemyEntity = {
                         this.isMoving = false;
                         this.lastMoveTime = k.time();
                         
-                        // Debug complete
-                        try {
-                            console.log(`[AI] ${this.name} completed move to ${this.gridX},${this.gridY}; pos ${this.pos.x?.toFixed?.(1)},${this.pos.y?.toFixed?.(1)}; isMoving=${this.isMoving}`);
-                        } catch (_) {}
+                        // Debug complete (disabled for performance)
+                        // console.log(`[AI] ${this.name} completed move to ${this.gridX},${this.gridY}`);
                         
                         // Return to idle animation if not in combat
                         if (this.currentAnimation === 'walk' && this.aiState !== 'chase' && this.aiState !== 'flee') {

@@ -222,10 +222,13 @@ const GameState = {
             following: true
         };
         
-        // Reset world state - clear all collected items
+        // Reset world state - clear all collected items and defeated enemies
         this.worldState = {
-            itemsCollected: [],
             currentLevel: 1,
+            itemsCollected: [],
+            enemiesDefeated: [],
+            doorsOpened: [],
+            exploredTiles: [],
             gameProgress: {}
         };
         

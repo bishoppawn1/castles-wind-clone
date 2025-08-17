@@ -1,9 +1,7 @@
 // Procedural dungeon generator for Castles of the Wind Clone
 // Outputs a levelData object compatible with LevelSystem.loadLevelData()
 
-// NOTE: This file is loaded as a module and also exposes a global for main.js usage
-
-export const DungeonGenerator = {
+const DungeonGenerator = {
     // Generate a dungeon level
     // width/height in tiles
     // options: { tileSize }

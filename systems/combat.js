@@ -166,6 +166,32 @@ const CombatSystem = {
                 console.log('Assigned currentPlayer to window.player for XP handling');
             }
             
+            // Trigger enemy defeated event for objectives system
+            if (target.enemyId) {
+                const eventData = {
+                    enemyType: target.enemyType?.id || target.enemyId || target.name || 'unknown',
+                    enemyId: target.enemyId,
+                    killedBy: attacker.name || 'player'
+                };
+                
+                // Try multiple ways to trigger the event
+                if (this.k && typeof this.k.trigger === 'function') {
+                    this.k.trigger('enemy_defeated', eventData);
+                    console.log(`📢 Triggered enemy_defeated via this.k:`, eventData);
+                }
+                
+                if (typeof window !== 'undefined' && window.k && typeof window.k.trigger === 'function') {
+                    window.k.trigger('enemy_defeated', eventData);
+                    console.log(`📢 Triggered enemy_defeated via window.k:`, eventData);
+                }
+                
+                // Direct call to objectives system as fallback
+                if (typeof window !== 'undefined' && window.ObjectivesSystem) {
+                    window.ObjectivesSystem.trackObjectiveProgress('enemy_defeated', eventData);
+                    console.log(`📢 Direct call to ObjectivesSystem:`, eventData);
+                }
+            }
+            
             // Let the enemy handle its own death (which includes XP and loot)
             if (typeof target.die === 'function') {
                 target.die();

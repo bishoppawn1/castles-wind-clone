@@ -296,6 +296,11 @@ const HealthBarUI = {
     
     // Update all health bars
     update() {
+        // Check if system is initialized
+        if (!this.healthBars) {
+            return; // System not initialized yet
+        }
+        
         // Update floating health bars
         this.healthBars.forEach((healthBarData, entity) => {
             if (entity && entity.exists && entity.exists()) {

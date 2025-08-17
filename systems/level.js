@@ -1,10 +1,7 @@
 // Level management system for Castles of the Wind Clone
 // Handles level loading, unloading, and transitions
 
-import { LEVELS, TILE_SYMBOLS, LevelUtils } from '../data/levels.js';
-import { TileSystem, TileInteractions } from '../data/tiles.js';
-
-export const LevelSystem = {
+const LevelSystem = {
     currentLevel: null,
     currentLevelData: null,
     levelTiles: [],
@@ -28,6 +25,10 @@ export const LevelSystem = {
         this.currentLevel = levelId;
         this.currentLevelData = levelData;
         
+        // Initialize systems
+        LevelGenSystem.init(k);
+        EnvironmentSystem.init(k);
+        
         // Create tiles
         this.createLevelTiles(k, levelData);
         
@@ -42,6 +43,11 @@ export const LevelSystem = {
         
         // Apply lighting
         this.applyLighting(k, levelData);
+        
+        // Create environmental features (stairs, traps, etc.)
+        if (typeof EnvironmentSystem !== 'undefined') {
+            EnvironmentSystem.createEnvironmentalFeatures(levelData);
+        }
         
         // Initialize fog of war
         this.initializeFogOfWar(k, levelData);
@@ -190,6 +196,14 @@ export const LevelSystem = {
                 if (itemType) {
                     const key = `${itemType}@${x},${y}`;
                     if (spawned.has(key)) continue;
+                    
+                    // Check if this item has already been collected
+                    const itemId = `${itemType}_${x}_${y}`;
+                    if (this.isItemCollected(itemId)) {
+                        console.log(`⏭️ Skipping collected layout item ${itemId} at (${x}, ${y})`);
+                        continue;
+                    }
+                    
                     const item = this.createItem(k, itemType, x, y, tileSize);
                     if (item) {
                         this.levelItems.push(item);
@@ -212,6 +226,14 @@ export const LevelSystem = {
                     // Avoid duplicate spawn
                     return;
                 }
+                
+                // Check if this item has already been collected
+                const itemId = `${itemType}_${itemData.x}_${itemData.y}`;
+                if (this.isItemCollected(itemId)) {
+                    console.log(`⏭️ Skipping collected level data item ${itemId} at (${itemData.x}, ${itemData.y})`);
+                    return;
+                }
+                
                 const item = this.createItem(k, itemType, itemData.x, itemData.y, tileSize, itemData);
                 if (item) {
                     this.levelItems.push(item);
@@ -222,7 +244,35 @@ export const LevelSystem = {
             console.warn("levelData.items is not an array; skipping items spawn");
         }
         
-        console.log(`Spawned ${this.levelItems.length} items`);
+        // Spawn chests from explicit level data
+        if (Array.isArray(levelData?.chests)) {
+            levelData.chests.forEach(chestData => {
+                if (!chestData || typeof chestData.x !== "number" || typeof chestData.y !== "number") {
+                    console.warn("Skipping invalid chestData entry:", chestData);
+                    return;
+                }
+                
+                const key = `chest@${chestData.x},${chestData.y}`;
+                if (spawned.has(key)) {
+                    return; // Avoid duplicate spawn
+                }
+                
+                // Check if this chest has already been opened
+                const chestId = `chest_${chestData.x}_${chestData.y}`;
+                if (this.isChestOpened(chestId)) {
+                    console.log(`⏭️ Skipping opened chest ${chestId} at (${chestData.x}, ${chestData.y})`);
+                    return;
+                }
+                
+                const chest = this.createChest(k, chestData.x, chestData.y, tileSize, chestData);
+                if (chest) {
+                    this.levelItems.push(chest);
+                    spawned.add(key);
+                }
+            });
+        }
+        
+        console.log(`Spawned ${this.levelItems.length} items and chests`);
     },
     
     // Get item type from symbol
@@ -236,6 +286,33 @@ export const LevelSystem = {
             'M': 'weapon'
         };
         return itemSymbols[symbol];
+    },
+
+    // Check if an item has already been collected
+    isItemCollected(itemId) {
+        if (typeof window.GameState === 'undefined' || !window.GameState.worldState.itemsCollected) {
+            return false;
+        }
+        
+        return window.GameState.worldState.itemsCollected.includes(itemId);
+    },
+
+    // Check if an enemy has already been defeated
+    isEnemyDefeated(enemyId) {
+        if (typeof window.GameState === 'undefined' || !window.GameState.worldState.enemiesDefeated) {
+            return false;
+        }
+        
+        return window.GameState.worldState.enemiesDefeated.includes(enemyId);
+    },
+
+    // Check if a chest has already been opened
+    isChestOpened(chestId) {
+        if (typeof window.GameState === 'undefined' || !window.GameState.worldState.chestsOpened) {
+            return false;
+        }
+        
+        return window.GameState.worldState.chestsOpened.includes(chestId);
     },
     
     // Create an item
@@ -280,6 +357,43 @@ export const LevelSystem = {
         
         return item;
     },
+
+    // Create a chest
+    createChest(k, gridX, gridY, tileSize, chestData = {}) {
+        // Use ChestEntity system if available
+        if (typeof window !== 'undefined' && window.ChestEntity) {
+            console.log(`📦 Creating chest via ChestEntity at (${gridX}, ${gridY}):`, chestData);
+            return window.ChestEntity.createChest(gridX, gridY, chestData);
+        }
+        
+        // Fallback: basic chest creation
+        const pixelX = gridX * tileSize + tileSize / 2;
+        const pixelY = gridY * tileSize + tileSize / 2;
+        
+        const chest = k.add([
+            k.rect(tileSize * 0.8, tileSize * 0.6),
+            k.color(139, 69, 19), // Brown
+            k.pos(pixelX, pixelY),
+            k.anchor("center"),
+            k.z(5),
+            k.outline(2, k.rgb(0, 0, 0)),
+            "chest",
+            "interactive",
+            {
+                gridX: gridX,
+                gridY: gridY,
+                type: chestData.type || 'wooden',
+                locked: chestData.locked || false,
+                opened: false,
+                keyRequired: chestData.keyRequired || null,
+                contents: chestData.contents || [],
+                id: `chest_${gridX}_${gridY}`
+            }
+        ]);
+        
+        console.log(`Created chest at (${gridX}, ${gridY}) with ${chestData.contents?.length || 0} items`);
+        return chest;
+    },
     
     // Spawn enemies from level data
     spawnLevelEnemies(k, levelData) {
@@ -312,6 +426,19 @@ export const LevelSystem = {
                 if (enemyType) {
                     const key = `${enemyType}@${x},${y}`;
                     if (spawned.has(key)) continue;
+                    
+                    // Check if this enemy has already been defeated
+                    const enemyId = `${enemyType}_${x}_${y}`;
+                    console.log(`🔍 SPAWN DEBUG: Checking enemy ${enemyId} at (${x}, ${y})`);
+                    console.log(`🔍 SPAWN DEBUG: GameState exists:`, typeof window.GameState !== 'undefined');
+                    console.log(`🔍 SPAWN DEBUG: Defeated enemies:`, window.GameState?.worldState?.enemiesDefeated);
+                    
+                    if (this.isEnemyDefeated(enemyId)) {
+                        console.log(`⚔️ Skipping defeated layout enemy ${enemyId} at (${x}, ${y})`);
+                        continue;
+                    }
+                    
+                    console.log(`✅ SPAWN DEBUG: Spawning enemy ${enemyId} at (${x}, ${y})`);
                     const enemy = this.createEnemy(k, enemyType, x, y, tileSize);
                     if (enemy) {
                         this.levelEnemies.push(enemy);
@@ -334,6 +461,18 @@ export const LevelSystem = {
                     // Avoid duplicate spawn
                     return;
                 }
+                
+                // Check if this enemy has already been defeated
+                const enemyId = `${enemyType}_${enemyData.x}_${enemyData.y}`;
+                console.log(`🔍 EXPLICIT SPAWN DEBUG: Checking enemy ${enemyId} at (${enemyData.x}, ${enemyData.y})`);
+                console.log(`🔍 EXPLICIT SPAWN DEBUG: Defeated enemies:`, window.GameState?.worldState?.enemiesDefeated);
+                
+                if (this.isEnemyDefeated(enemyId)) {
+                    console.log(`⚔️ Skipping defeated level data enemy ${enemyId} at (${enemyData.x}, ${enemyData.y})`);
+                    return;
+                }
+                
+                console.log(`✅ EXPLICIT SPAWN DEBUG: Spawning enemy ${enemyId} at (${enemyData.x}, ${enemyData.y})`);
                 const enemy = this.createEnemy(k, enemyType, enemyData.x, enemyData.y, tileSize, enemyData);
                 if (enemy) {
                     this.levelEnemies.push(enemy);
@@ -626,21 +765,29 @@ export const LevelSystem = {
         
         const { unexploredOpacity } = levelData.fogOfWar;
         
-        // Apply fog to all tiles initially
+        // Apply fog to all tiles initially - DISABLED to prevent black tiles
         this.levelTiles.forEach(tile => {
-            TileSystem.applyFogOfWar(tile, unexploredOpacity);
+            // Keep tiles fully visible instead of applying fog opacity
+            tile.opacity = 1.0;
         });
         
         console.log("Fog of war initialized");
     },
     
-    // Update fog of war around player
+    // Update fog of war around player - OPTIMIZED for performance
     updateFogOfWar(k, playerGridX, playerGridY) {
         if (!this.currentLevelData?.fogOfWar?.enabled) return;
         
+        // Performance optimization: Only update fog of war if player moved
+        if (this.lastFogUpdateX === playerGridX && this.lastFogUpdateY === playerGridY) {
+            return; // Skip update if player hasn't moved
+        }
+        this.lastFogUpdateX = playerGridX;
+        this.lastFogUpdateY = playerGridY;
+        
         const { visionRadius, exploredOpacity } = this.currentLevelData.fogOfWar;
         
-        // Reveal tiles around player
+        // Simplified fog of war - just set tiles to visible in vision range
         for (let dy = -visionRadius; dy <= visionRadius; dy++) {
             for (let dx = -visionRadius; dx <= visionRadius; dx++) {
                 const distance = Math.sqrt(dx * dx + dy * dy);
@@ -650,12 +797,8 @@ export const LevelSystem = {
                     const tile = TileSystem.getTileAt(k, tileX, tileY);
                     
                     if (tile) {
-                        // Make tiles closest to the player fully visible (1.0),
-                        // fading smoothly down to exploredOpacity at the edge of vision.
-                        const frac = 1 - (distance / (visionRadius + 0.0001));
-                        const clamped = Math.max(0, Math.min(1, frac));
-                        const visibility = exploredOpacity + (1 - exploredOpacity) * clamped;
-                        TileSystem.revealTile(tile, visibility);
+                        // Simplified: just set to full visibility in vision range
+                        TileSystem.revealTile(tile, 1.0);
                     }
                 }
             }
@@ -680,7 +823,9 @@ export const LevelSystem = {
     updateEntityVisibility(k, playerGridX, playerGridY) {
         if (!this.currentLevelData?.fogOfWar?.enabled) return;
         const fog = this.currentLevelData.fogOfWar;
-        const dims = LevelUtils.getDimensions(this.currentLevelData);
+        const dims = (typeof window !== 'undefined' && window.LevelUtils) 
+            ? window.LevelUtils.getDimensions(this.currentLevelData)
+            : { width: this.currentLevelData.width, height: this.currentLevelData.height, tileSize: this.currentLevelData.tileSize || 32 };
         const tileSize = dims.tileSize || 32;
 
         // Helper: derive grid position for an object
@@ -749,24 +894,24 @@ export const LevelSystem = {
         if (!this.currentLevelData) return false;
         
         // First check if the tile itself is walkable
-        const tileWalkable = LevelUtils.isWalkable(this.currentLevelData, gridX, gridY);
+        const tileWalkable = (typeof window !== 'undefined' && window.LevelUtils) 
+            ? window.LevelUtils.isWalkable(this.currentLevelData, gridX, gridY)
+            : this.fallbackIsWalkable(gridX, gridY);
         if (!tileWalkable) return false;
         
         // Then check for closed doors at this position
-        console.log(`🔧 LevelSystem.isWalkable: this.k = ${typeof this.k}, window.k = ${typeof window.k}`);
+        // console.log(`🔧 LevelSystem.isWalkable: this.k = ${typeof this.k}, window.k = ${typeof window.k}`);
         const k = this.k || window.k;
         if (k && typeof k.get === 'function') {
             const doors = k.get('door');
-            console.log(`🔧 Checking walkability at (${gridX}, ${gridY}) - found ${doors.length} doors`);
+            // console.log(`🔧 Checking walkability at (${gridX}, ${gridY}) - found ${doors.length} doors`);
             for (let door of doors) {
-                console.log(`🔧 Door at (${door.gridX}, ${door.gridY}) - solid: ${door.solid}, isOpen: ${door.isOpen}`);
+                // console.log(`🔧 Door at (${door.gridX}, ${door.gridY}) - solid: ${door.solid}, isOpen: ${door.isOpen}`);
                 if (door.gridX === gridX && door.gridY === gridY && door.solid) {
-                    console.log(`🚪 Movement blocked by closed door at (${gridX}, ${gridY})`);
+                    // console.log(`🚪 Movement blocked by closed door at (${gridX}, ${gridY})`);
                     return false;
                 }
             }
-        } else {
-            console.log(`🔧 No Kaboom context available for door collision check`);
         }
         
         return true;
@@ -775,13 +920,41 @@ export const LevelSystem = {
     // Get level dimensions
     getLevelDimensions() {
         if (!this.currentLevelData) return { width: 50, height: 38, tileSize: 32 };
-        return LevelUtils.getDimensions(this.currentLevelData);
+        return (typeof window !== 'undefined' && window.LevelUtils) 
+            ? window.LevelUtils.getDimensions(this.currentLevelData)
+            : { width: this.currentLevelData.width, height: this.currentLevelData.height, tileSize: this.currentLevelData.tileSize || 32 };
+    },
+    
+    // Fallback walkability check when LevelUtils is not available
+    fallbackIsWalkable(gridX, gridY) {
+        if (!this.currentLevelData || !this.currentLevelData.layout) return false;
+        if (gridY < 0 || gridY >= this.currentLevelData.layout.length || 
+            gridX < 0 || gridX >= this.currentLevelData.layout[0].length) {
+            return false;
+        }
+        
+        const symbol = this.currentLevelData.layout[gridY][gridX];
+        
+        // Entity symbols on floor are walkable
+        const entitySymbolsOnFloor = new Set(['@', 'T', 'C', 'P', 'G', 'A', 'M', 'g', 'o', 'r', 's', 'E']);
+        if (entitySymbolsOnFloor.has(symbol)) {
+            return true;
+        }
+        
+        // Basic walkable tiles
+        const walkableSymbols = new Set(['.', 'f', 'w', 'D', 'E']);
+        return walkableSymbols.has(symbol);
     }
 };
+
+// Make globally available
+if (typeof window !== 'undefined') {
+    window.LevelSystem = LevelSystem;
+}
+
+console.log('🏰 Level System loaded successfully');
 
 // Expose to global for non-module access (e.g., main.js)
 if (typeof window !== 'undefined') {
     window.LevelSystem = LevelSystem;
-    window.LevelUtils = LevelUtils;
-    window.TILE_SYMBOLS = TILE_SYMBOLS;
 }

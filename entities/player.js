@@ -79,14 +79,14 @@ const PlayerEntity = {
                 // Methods
                 updateFacing(direction) {
                     this.facing = direction;
-                    console.log(`👤 Player facing: ${direction}`);
+                    // console.log(`👤 Player facing: ${direction}`); // Disabled for performance
                 },
                 
                 playAnimation(animationType) {
                     if (this.currentAnimation !== animationType) {
                         this.currentAnimation = animationType;
                         this.animationTime = 0;
-                        console.log(`🎭 Playing animation: ${animationType}`);
+                        // console.log(`🎭 Playing animation: ${animationType}`); // Disabled for performance
                     }
                 },
                 
@@ -121,21 +121,28 @@ const PlayerEntity = {
                             window.CombatSystem.endCombat();
                         }
                         
-                        // Trigger game over screen after a short delay
+                        // Trigger respawn screen after a short delay
                         setTimeout(() => {
-                            const stats = {
-                                level: this.level,
-                                enemiesKilled: this.enemiesKilled || 0,
-                                itemsCollected: this.itemsCollected || 0,
-                                gold: this.gold
-                            };
-                            
-                            // Go to game over scene
-                            if (window.k) {
-                                window.k.go('gameover', {
-                                    message: 'You have been defeated in combat!',
-                                    stats: stats
-                                });
+                            if (window.ProgressionSystem) {
+                                ProgressionSystem.triggerDeathScreen(
+                                    'You have been defeated in combat!',
+                                    'combat'
+                                );
+                            } else {
+                                // Fallback to old game over system if ProgressionSystem not available
+                                const stats = {
+                                    level: this.level,
+                                    enemiesKilled: this.enemiesKilled || 0,
+                                    itemsCollected: this.itemsCollected || 0,
+                                    gold: this.gold
+                                };
+                                
+                                if (window.k) {
+                                    window.k.go('gameover', {
+                                        message: 'You have been defeated in combat!',
+                                        stats: stats
+                                    });
+                                }
                             }
                         }, 1500); // 1.5 second delay for dramatic effect
                     }
